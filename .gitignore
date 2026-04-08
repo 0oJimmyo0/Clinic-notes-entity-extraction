@@ -1,0 +1,26 @@
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Python cache/env
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+.env
+
+# Large raw and structured data chunks (excluded)
+raw/
+struct_data/
+
+# Large generated outputs outside this repo root are intentionally not included.
+# If copied under this repo in future, keep them ignored:
+episode_extraction_results/
+logs/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
