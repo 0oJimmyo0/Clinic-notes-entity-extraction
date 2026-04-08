@@ -17,6 +17,10 @@ venv/
 raw/
 struct_data/
 
+# Generated lexicon datasets (can be rebuilt from scripts)
+lexicons/*.csv
+lexicons/build_summary.json
+
 # Large generated outputs outside this repo root are intentionally not included.
 # If copied under this repo in future, keep them ignored:
 episode_extraction_results/
