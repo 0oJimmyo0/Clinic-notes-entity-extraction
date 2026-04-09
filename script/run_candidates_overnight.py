@@ -285,16 +285,44 @@ def process_chunk(
     chunk_file: Path,
     candidate_patterns: List[Tuple[re.Pattern, str]],
     max_candidates_per_patient: int = 40,
+    note_text_col_candidates: Optional[List[str]] = None,
     target_drugs_dict: Optional[Dict] = None,
 ) -> pd.DataFrame:
     t0 = time.time()
     print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Processing {chunk_file.name}")
     df = pd.read_parquet(chunk_file)
+    note_text_col_candidates = note_text_col_candidates or ["note_text"]
+
+    note_text_col = None
+    for c in note_text_col_candidates:
+        if c in df.columns:
+            note_text_col = c
+            break
+    if note_text_col is None:
+        raise ValueError(
+            f"No note text column found in {chunk_file.name}; tried {note_text_col_candidates}"
+        )
+
     df["person_id"] = pd.to_numeric(df["person_id"], errors="coerce")
-    df = df[df["person_id"].notna() & df["note_text"].notna()]
+    df["note_text_scan"] = df[note_text_col].fillna("").astype(str)
+    df = df[df["person_id"].notna() & (df["note_text_scan"].str.strip() != "")]
     if df.empty:
         print("  -> empty chunk after filtering")
         return pd.DataFrame()
+
+    note_len = df["note_text_scan"].str.len()
+    max_len = int(note_len.max()) if len(note_len) else 0
+    p50 = float(note_len.quantile(0.5)) if len(note_len) else 0.0
+    p90 = float(note_len.quantile(0.9)) if len(note_len) else 0.0
+    pct_eq_max = float((note_len == max_len).mean() * 100.0) if len(note_len) else 0.0
+    print(
+        f"  Note text column: {note_text_col} | len p50={p50:.0f} p90={p90:.0f} max={max_len} "
+        f"| pct_len==max={pct_eq_max:.1f}%"
+    )
+    if max_len == 2000 and pct_eq_max >= 10.0:
+        print(
+            "  WARNING: strong 2000-char hard-cap signature detected; full-note scanning may be limited by upstream truncation."
+        )
 
     grouped = df.groupby("person_id", sort=False)
     print(f"  Notes: {len(df):,} | Patients: {grouped.ngroups:,}")
@@ -310,7 +338,7 @@ def process_chunk(
         patient_candidates: List[Dict] = []
 
         for row in patient_notes.itertuples(index=False):
-            note_text = getattr(row, "note_text", "")
+            note_text = getattr(row, "note_text_scan", "")
             note_date = getattr(row, "note_date", "")
             note_id = (
                 getattr(row, "note_id", None)
@@ -421,6 +449,11 @@ def parse_args() -> argparse.Namespace:
         default=40,
         help="Per-patient candidate cap for speed/memory.",
     )
+    parser.add_argument(
+        "--note-text-col-candidates",
+        default="note_text_full,full_note_text,note_text,text",
+        help="Comma-separated note text columns to try in order.",
+    )
     parser.add_argument("--force", action="store_true", help="Reprocess chunks even if output exists.")
     parser.add_argument("--combine", action="store_true", help="Write all_candidates_combined.csv at end.")
     parser.add_argument(
@@ -433,6 +466,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    note_text_cols = [x.strip() for x in str(args.note_text_col_candidates).split(",") if x.strip()]
 
     project_root = Path(__file__).resolve().parents[2]
     chunk_dir = (project_root / args.chunk_dir).resolve()
@@ -453,6 +487,7 @@ def main() -> int:
     print(f"State file:   {state_path}")
     print(f"Force mode:   {args.force}")
     print(f"Combine end:  {args.combine}")
+    print(f"Note text col candidates: {note_text_cols}")
     print("=" * 88)
 
     chunks = resolve_chunks(
@@ -489,6 +524,7 @@ def main() -> int:
                 chunk_file=chunk_path,
                 candidate_patterns=cand_patterns,
                 max_candidates_per_patient=args.max_candidates_per_patient,
+                note_text_col_candidates=note_text_cols,
             )
             tmp = out_csv.with_suffix(".csv.tmp")
             df_out.to_csv(tmp, index=False)

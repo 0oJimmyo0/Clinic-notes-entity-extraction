@@ -10,6 +10,9 @@ Core outputs:
 - adjudication_subset_manifest.csv         (visit-level sample)
 - evaluation_note_manifest.csv             (note traceability for downstream cohort)
 - adjudication_note_manifest.csv           (note traceability for adjudication subset)
+- full_visit_eligible_notes.parquet        (optional note payload export)
+- evaluation_cohort_notes.parquet          (optional note payload export)
+- adjudication_subset_notes.parquet        (optional note payload export)
 - cohort_justification_summary.json
 
 Example:
@@ -42,6 +45,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--notes-dir", type=Path, default=Path("episode_notes"))
     ap.add_argument("--glob", default="episode_notes_chunk*.parquet")
     ap.add_argument(
+        "--note-text-col-candidates",
+        default="note_text_full,full_note_text,note_text,text",
+        help="Comma-separated note text columns to try in order.",
+    )
+    ap.add_argument(
         "--candidate-csv",
         type=Path,
         default=Path("episode_extraction_results/archive_candidates/all_candidates_combined.csv"),
@@ -54,6 +62,16 @@ def parse_args() -> argparse.Namespace:
         help="Visit-level structured entities file",
     )
     ap.add_argument("--output-dir", type=Path, default=Path("episode_notes/manifests"))
+    ap.add_argument(
+        "--write-cohort-note-parquet",
+        action="store_true",
+        help="Write cohort note parquet files under output-dir.",
+    )
+    ap.add_argument(
+        "--no-write-cohort-note-parquet",
+        action="store_true",
+        help="Disable writing cohort note parquet files.",
+    )
 
     # Inclusion/exclusion controls
     ap.add_argument("--min-note-chars", type=int, default=20)
@@ -90,6 +108,13 @@ def parse_args() -> argparse.Namespace:
 
 def _normalize_note_type(series: pd.Series) -> pd.Series:
     return series.fillna("").astype(str).str.strip().replace({"": "<UNKNOWN_NOTE_TYPE>"})
+
+
+def _resolve_note_text_col(df: pd.DataFrame, candidates: list[str]) -> str:
+    for c in candidates:
+        if c in df.columns:
+            return c
+    raise ValueError(f"No note text column found. Tried: {candidates}")
 
 
 def _is_template_like(text: str) -> bool:
@@ -197,20 +222,32 @@ def _collect_note_ids(values: Iterable) -> str:
 
 def main() -> None:
     args = parse_args()
+    note_text_col_candidates = [x.strip() for x in str(args.note_text_col_candidates).split(",") if x.strip()]
+    write_note_parquet = bool(not args.no_write_cohort_note_parquet)
 
     files = sorted(args.notes_dir.glob(args.glob))
     if not files:
         raise SystemExit(f"No files matched: {args.notes_dir / args.glob}")
 
-    needed = ["person_id", "visit_occurrence_id", "note_id", "note_text", "note_title"]
+    needed = ["person_id", "visit_occurrence_id", "note_id", "note_title"]
     frames = []
+    used_note_text_cols: list[str] = []
     for p in files:
         df = pd.read_parquet(p)
         miss = [c for c in needed if c not in df.columns and c != "note_title"]
         if miss:
             raise SystemExit(f"Missing columns {miss} in {p}")
-        keep_cols = [c for c in ["person_id", "visit_occurrence_id", "note_id", "note_text", "note_title", "note_date", "note_datetime"] if c in df.columns]
-        frames.append(df[keep_cols])
+        note_text_col = _resolve_note_text_col(df, note_text_col_candidates)
+        used_note_text_cols.append(note_text_col)
+        keep_cols = [
+            c
+            for c in ["person_id", "visit_occurrence_id", "note_id", "note_title", "note_date", "note_datetime"]
+            if c in df.columns
+        ]
+        chunk = df[keep_cols].copy()
+        chunk["note_text"] = df[note_text_col]
+        chunk["source_note_text_col"] = note_text_col
+        frames.append(chunk)
 
     all_notes = pd.concat(frames, ignore_index=True)
     all_notes["person_id"] = pd.to_numeric(all_notes["person_id"], errors="coerce").astype("Int64")
@@ -223,6 +260,8 @@ def main() -> None:
 
     summary = {
         "notes_input": int(len(all_notes)),
+        "note_text_col_candidates": note_text_col_candidates,
+        "used_note_text_cols": sorted(set(used_note_text_cols)),
         "notes_after_valid_ids": 0,
         "notes_after_non_empty": 0,
         "notes_after_min_chars": 0,
@@ -260,6 +299,22 @@ def main() -> None:
     work["note_text_norm"] = work["note_text"].str.strip().str.lower().str.replace(r"\s+", " ", regex=True)
     work = work.drop_duplicates(subset=["person_id", "visit_occurrence_id", "note_text_norm"], keep="first").copy()
     summary["notes_after_dedup_text_within_visit"] = int(len(work))
+
+    if len(work):
+        note_len = work["note_len"]
+        max_note_len = int(note_len.max())
+        pct_eq_max = float((note_len == max_note_len).mean() * 100.0)
+        summary["max_note_len_after_dedup"] = max_note_len
+        summary["pct_note_len_eq_max_after_dedup"] = pct_eq_max
+        summary["pct_note_len_eq_2000_after_dedup"] = float((note_len == 2000).mean() * 100.0)
+        summary["pct_note_len_ge_1800_after_dedup"] = float((note_len >= 1800).mean() * 100.0)
+        summary["suspected_hard_cap_2000"] = bool(max_note_len == 2000 and pct_eq_max >= 10.0)
+    else:
+        summary["max_note_len_after_dedup"] = 0
+        summary["pct_note_len_eq_max_after_dedup"] = 0.0
+        summary["pct_note_len_eq_2000_after_dedup"] = 0.0
+        summary["pct_note_len_ge_1800_after_dedup"] = 0.0
+        summary["suspected_hard_cap_2000"] = False
 
     # Candidate span coverage by visit.
     cand = None
@@ -374,17 +429,19 @@ def main() -> None:
     else:
         adjud_subset = adjud_pool.copy()
 
-    # Note-level traceability manifests.
-    eval_visits = set(zip(evaluation_visit["person_id"], evaluation_visit["visit_occurrence_id"]))
-    adjud_visits = set(zip(adjud_subset["person_id"], adjud_subset["visit_occurrence_id"]))
+    # Note-level traceability manifests (merge-based for speed).
+    eval_visit_keys = evaluation_visit[["person_id", "visit_occurrence_id"]].drop_duplicates()
+    adjud_visit_keys = adjud_subset[["person_id", "visit_occurrence_id"]].drop_duplicates()
 
-    eval_note_manifest = work[
-        work.apply(lambda r: (r["person_id"], r["visit_occurrence_id"]) in eval_visits, axis=1)
-    ][["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]].copy()
+    eval_notes = work.merge(eval_visit_keys, on=["person_id", "visit_occurrence_id"], how="inner")
+    adjud_notes = work.merge(adjud_visit_keys, on=["person_id", "visit_occurrence_id"], how="inner")
 
-    adjud_note_manifest = work[
-        work.apply(lambda r: (r["person_id"], r["visit_occurrence_id"]) in adjud_visits, axis=1)
-    ][["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]].copy()
+    eval_note_manifest = eval_notes[
+        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]
+    ].copy()
+    adjud_note_manifest = adjud_notes[
+        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]
+    ].copy()
 
     # Write outputs.
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -393,6 +450,9 @@ def main() -> None:
     adjud_visit_path = args.output_dir / "adjudication_subset_manifest.csv"
     eval_note_path = args.output_dir / "evaluation_note_manifest.csv"
     adjud_note_path = args.output_dir / "adjudication_note_manifest.csv"
+    full_notes_parquet_path = args.output_dir / "full_visit_eligible_notes.parquet"
+    eval_notes_parquet_path = args.output_dir / "evaluation_cohort_notes.parquet"
+    adjud_notes_parquet_path = args.output_dir / "adjudication_subset_notes.parquet"
     summary_path = args.output_dir / "cohort_justification_summary.json"
 
     full_visit_eligible.to_csv(full_visit_path, index=False)
@@ -400,6 +460,27 @@ def main() -> None:
     adjud_subset.to_csv(adjud_visit_path, index=False)
     eval_note_manifest.to_csv(eval_note_path, index=False)
     adjud_note_manifest.to_csv(adjud_note_path, index=False)
+
+    if write_note_parquet:
+        base_cols = [
+            c
+            for c in [
+                "person_id",
+                "visit_occurrence_id",
+                "note_id",
+                "note_date",
+                "note_datetime",
+                "note_title",
+                "note_title_norm",
+                "note_len",
+                "note_text",
+                "source_note_text_col",
+            ]
+            if c in work.columns
+        ]
+        work[base_cols].drop_duplicates(subset=["note_id"]).to_parquet(full_notes_parquet_path, index=False)
+        eval_notes[base_cols].drop_duplicates(subset=["note_id"]).to_parquet(eval_notes_parquet_path, index=False)
+        adjud_notes[base_cols].drop_duplicates(subset=["note_id"]).to_parquet(adjud_notes_parquet_path, index=False)
 
     summary.update(
         {
@@ -413,6 +494,7 @@ def main() -> None:
             "adjudication_patients": int(adjud_subset["person_id"].nunique()) if len(adjud_subset) else 0,
             "sampling_mode": args.sampling_mode,
             "stratify_by": args.stratify_by,
+            "write_cohort_note_parquet": write_note_parquet,
             "require_candidates_for_adjudication": bool(args.require_candidates_for_adjudication),
             "require_structured_drugs_for_downstream": bool(args.require_structured_drugs_for_downstream),
             "output_files": {
@@ -421,6 +503,9 @@ def main() -> None:
                 "adjudication_subset_manifest": str(adjud_visit_path),
                 "evaluation_note_manifest": str(eval_note_path),
                 "adjudication_note_manifest": str(adjud_note_path),
+                "full_visit_eligible_notes_parquet": str(full_notes_parquet_path) if write_note_parquet else None,
+                "evaluation_cohort_notes_parquet": str(eval_notes_parquet_path) if write_note_parquet else None,
+                "adjudication_subset_notes_parquet": str(adjud_notes_parquet_path) if write_note_parquet else None,
             },
         }
     )
@@ -430,6 +515,10 @@ def main() -> None:
     print("full_eligible_visits", len(full_visit_eligible))
     print("evaluation_visits", len(evaluation_visit))
     print("adjudication_visits", len(adjud_subset))
+    print("evaluation_notes", len(eval_notes))
+    print("adjudication_notes", len(adjud_notes))
+    if summary.get("suspected_hard_cap_2000"):
+        print("WARNING: suspected hard 2000-char note cap detected in selected note text column.")
     print("output_dir", args.output_dir)
     print("summary", summary_path)
 
