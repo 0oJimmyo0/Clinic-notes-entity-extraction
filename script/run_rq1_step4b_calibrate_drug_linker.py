@@ -42,7 +42,7 @@ def _drug_nonempty_metrics(pairs_rows: List[Dict[str, str]]) -> Dict[str, float]
 
 def _diag_guardrails(diag_rows: List[Dict[str, str]], low_conf_threshold: float) -> Dict[str, float]:
     if not diag_rows:
-        return {"n_rows": 0.0, "accept_rate": 0.0, "low_conf_accept_rate": 0.0}
+        return {"n_rows": 0.0, "accept_rate": 0.0, "low_conf_accept_rate": 0.0, "mean_accept_conf": 0.0}
     accepted_scores: List[float] = []
     for row in diag_rows:
         try:
@@ -54,16 +54,24 @@ def _diag_guardrails(diag_rows: List[Dict[str, str]], low_conf_threshold: float)
         for info in diag.values():
             if isinstance(info, dict) and bool(info.get("accepted")):
                 try:
-                    accepted_scores.append(float(info.get("score", 0.0)))
+                    accepted_scores.append(
+                        float(info.get("calibrated_confidence", info.get("score", 0.0)))
+                    )
                 except Exception:
                     pass
     if not accepted_scores:
-        return {"n_rows": float(len(diag_rows)), "accept_rate": 0.0, "low_conf_accept_rate": 0.0}
+        return {
+            "n_rows": float(len(diag_rows)),
+            "accept_rate": 0.0,
+            "low_conf_accept_rate": 0.0,
+            "mean_accept_conf": 0.0,
+        }
     low = sum(1 for s in accepted_scores if s < low_conf_threshold)
     return {
         "n_rows": float(len(diag_rows)),
         "accept_rate": float(len(accepted_scores)) / max(len(diag_rows), 1),
         "low_conf_accept_rate": float(low) / max(len(accepted_scores), 1),
+        "mean_accept_conf": float(mean(accepted_scores)),
     }
 
 

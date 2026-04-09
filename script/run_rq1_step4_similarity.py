@@ -29,8 +29,12 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 from rq1_drug_linking import (
+    PathBConfig,
+    build_canonical_drug_universe,
     canonicalize_drug,
+    load_abbreviation_map,
     load_alias_map,
+    load_calibration_config,
     resolve_note_drugs_hybrid,
     summarize_link_diagnostics,
 )
@@ -327,6 +331,8 @@ def compute_metrics(
     drug_linker: str,
     drug_linker_threshold: float,
     drug_alias_map: Dict[str, str],
+    drug_candidate_universe,
+    pathb_config,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[dict]]:
     merged = note_df.merge(ehr_df, on=["person_id", "visit_id"], how="inner", suffixes=("_note", "_ehr"))
 
@@ -354,6 +360,29 @@ def compute_metrics(
                         alias_map=drug_alias_map,
                         use_embedding=True,
                         threshold=drug_linker_threshold,
+                        pathb_mode="embedding_cpu",
+                    )
+                    link_diag_rows.append(
+                        {
+                            "person_id": row["person_id"],
+                            "visit_id": row["visit_id"],
+                            "window_k": window_k,
+                            "method_label": method_label,
+                            "domain": "drugs",
+                            "diagnostics_json": json.dumps(diag, ensure_ascii=False),
+                            **summarize_link_diagnostics([diag]),
+                        }
+                    )
+                elif drug_linker == "canonical_transparent":
+                    n, diag = resolve_note_drugs_hybrid(
+                        note_terms=n,
+                        ehr_terms=e,
+                        alias_map=drug_alias_map,
+                        use_embedding=False,
+                        threshold=drug_linker_threshold,
+                        pathb_mode="canonical_transparent",
+                        candidate_universe=drug_candidate_universe,
+                        pathb_config=pathb_config,
                     )
                     link_diag_rows.append(
                         {
@@ -455,15 +484,74 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--drug-linker",
-        choices=["none", "embedding_cpu"],
+        choices=["none", "embedding_cpu", "canonical_transparent"],
         default="none",
-        help="Optional second-stage linker for drugs.",
+        help="Optional second-stage linker for unresolved drug mentions.",
     )
     p.add_argument(
         "--drug-linker-threshold",
         type=float,
         default=0.85,
-        help="Cosine threshold for embedding_cpu linker acceptance.",
+        help="Legacy threshold for embedding_cpu mode (and fallback min-score seed).",
+    )
+    p.add_argument(
+        "--drug-canonical-vocab-path",
+        default="",
+        help=(
+            "Optional canonical candidate vocabulary file (CSV/JSON). "
+            "Expected fields include canonical_label and optional synonyms/aliases."
+        ),
+    )
+    p.add_argument(
+        "--drug-adjudicated-labels-csv",
+        default="",
+        help="Optional adjudicated note reference CSV for canonical labels.",
+    )
+    p.add_argument(
+        "--drug-linker-top-k",
+        type=int,
+        default=20,
+        help="Top-k candidates retrieved/scored per unresolved mention in canonical_transparent mode.",
+    )
+    p.add_argument(
+        "--drug-linker-min-score",
+        type=float,
+        default=0.45,
+        help="Minimum raw feature score to accept a Path B link.",
+    )
+    p.add_argument(
+        "--drug-linker-min-margin",
+        type=float,
+        default=0.05,
+        help="Minimum top1-top2 score margin to accept a Path B link.",
+    )
+    p.add_argument(
+        "--drug-linker-min-mention-len",
+        type=int,
+        default=4,
+        help="Reject Path B linking when normalized mention length is below this threshold.",
+    )
+    p.add_argument(
+        "--drug-linker-min-score-short-mention",
+        type=float,
+        default=0.80,
+        help="Higher minimum score for short/ambiguous mentions.",
+    )
+    p.add_argument(
+        "--drug-linker-min-calibrated-confidence",
+        type=float,
+        default=0.90,
+        help="Accept only if calibrated confidence meets this target precision.",
+    )
+    p.add_argument(
+        "--drug-linker-calibration-json",
+        default="",
+        help="Optional calibration JSON (identity/platt/isotonic_bins).",
+    )
+    p.add_argument(
+        "--drug-abbreviation-json",
+        default="",
+        help="Optional abbreviation expansion JSON (e.g., tax -> paclitaxel).",
     )
     p.add_argument(
         "--drug-aliases-json",
@@ -540,6 +628,38 @@ def main() -> int:
     all_link_diags: List[dict] = []
     drug_alias_map = load_alias_map(alias_path) if args.drug_normalizer == "v2" else {}
 
+    drug_candidate_universe = None
+    pathb_config = None
+    if args.drug_linker == "canonical_transparent":
+        vocab_path = (root / args.drug_canonical_vocab_path).resolve() if args.drug_canonical_vocab_path else None
+        adjud_path = (
+            (root / args.drug_adjudicated_labels_csv).resolve() if args.drug_adjudicated_labels_csv else None
+        )
+        calib_path = (root / args.drug_linker_calibration_json).resolve() if args.drug_linker_calibration_json else None
+        abbr_path = (root / args.drug_abbreviation_json).resolve() if args.drug_abbreviation_json else None
+
+        calibration_cfg = load_calibration_config(calib_path)
+        abbreviation_map = load_abbreviation_map(abbr_path)
+        pathb_config = PathBConfig(
+            top_k=max(int(args.drug_linker_top_k), 1),
+            min_score=float(args.drug_linker_min_score),
+            min_margin=float(args.drug_linker_min_margin),
+            min_mention_len=max(int(args.drug_linker_min_mention_len), 1),
+            min_score_short_mention=float(args.drug_linker_min_score_short_mention),
+            min_calibrated_confidence=float(args.drug_linker_min_calibrated_confidence),
+            calibration=calibration_cfg,
+            abbreviation_map=abbreviation_map,
+        )
+        drug_candidate_universe = build_canonical_drug_universe(
+            alias_map=drug_alias_map,
+            canonical_vocab_path=vocab_path,
+            adjudicated_labels_path=adjud_path,
+        )
+        print(
+            "Path B canonical universe loaded: "
+            f"{len(drug_candidate_universe.candidates):,} candidates"
+        )
+
     for k in windows:
         if k == 0:
             ehr_k = ehr.copy()
@@ -561,6 +681,8 @@ def main() -> int:
             drug_linker=args.drug_linker,
             drug_linker_threshold=args.drug_linker_threshold,
             drug_alias_map=drug_alias_map,
+            drug_candidate_universe=drug_candidate_universe,
+            pathb_config=pathb_config,
         )
         all_summary.append(summary_k)
         all_pairs.append(pairs_k)
