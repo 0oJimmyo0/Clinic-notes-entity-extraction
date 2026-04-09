@@ -686,20 +686,33 @@ def resolve_note_drugs_hybrid(
     if not note_c:
         return [], diagnostics
 
-    # Path A exact canonical match first.
     mapped = []
     unresolved = []
-    for t in note_c:
-        if t in ehr_set:
-            mapped.append(t)
-            diagnostics[t] = {"stage": "path_a", "linked_to": t, "score": 1.0, "accepted": True}
-        else:
-            unresolved.append(t)
 
     # Path B transparent canonical-universe linker.
-    if pathb_mode == "canonical_transparent" and unresolved:
+    if pathb_mode == "canonical_transparent":
         universe = candidate_universe or build_canonical_drug_universe(alias_map=alias_map)
         cfg = pathb_config or PathBConfig(min_score=float(threshold))
+
+        # Path A for canonical mode: deterministic exact match to canonical vocabulary.
+        for t in note_c:
+            exact = universe.synonym_to_canonical.get(t, "")
+            if exact:
+                mapped.append(exact)
+                diagnostics[t] = {
+                    "stage": "path_a_exact_vocab",
+                    "mention_patha_input": t,
+                    "linked_to": exact,
+                    "score": 1.0,
+                    "calibrated_confidence": 1.0,
+                    "accepted": True,
+                    "reason_codes": ["deterministic_exact_match"],
+                    "top_k_candidates": [],
+                    "feature_values": {},
+                }
+            else:
+                unresolved.append(t)
+
         for t in unresolved:
             decision = _link_unresolved_mention(
                 mention_norm=t,
@@ -723,8 +736,18 @@ def resolve_note_drugs_hybrid(
                 "feature_values": decision["feature_values"],
             }
 
+        return sorted(set(mapped)), diagnostics
+
+    # Path A exact canonical match first (legacy EHR-overlap framing).
+    for t in note_c:
+        if t in ehr_set:
+            mapped.append(t)
+            diagnostics[t] = {"stage": "path_a", "linked_to": t, "score": 1.0, "accepted": True}
+        else:
+            unresolved.append(t)
+
     # Path B legacy embedding-style matcher for unresolved terms.
-    elif use_embedding and unresolved and ehr_c:
+    if use_embedding and unresolved and ehr_c:
         linker = CharNgramLinker(ehr_c)
         for t in unresolved:
             cand, score = linker.best(t)
