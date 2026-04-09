@@ -20,12 +20,11 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Set, Tuple
 
-from rq1_drug_linking import normalize_drug_text
+from rq1_drug_linking import load_alias_map, normalize_drug_text
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
@@ -126,8 +125,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build canonical drug vocabulary table for RQ1 Path B.")
     p.add_argument(
         "--alias-json",
-        default="resources/lexicons/rq1_drug_aliases.json",
-        help="Alias map JSON (brand/shorthand -> canonical).",
+        default="resources/manual/pathA_alias_map.json",
+        help="Path A alias JSON, either flat or structured.",
     )
     p.add_argument(
         "--rxnorm-terms-csv",
@@ -188,10 +187,8 @@ def main() -> int:
 
     # 1) Alias map (small, high-precision deterministic mappings)
     if alias_path.exists():
-        raw = json.loads(alias_path.read_text(encoding="utf-8"))
-        if isinstance(raw, dict):
-            for k, v in raw.items():
-                _add_entry(table, canonical_raw=str(v), synonyms_raw=[str(k), str(v)], source_tag="alias")
+        for alias, canonical in load_alias_map(alias_path).items():
+            _add_entry(table, canonical_raw=str(canonical), synonyms_raw=[str(alias), str(canonical)], source_tag="alias")
 
     # 2) Public-source vocabulary terms (e.g. RxNorm-derived)
     if rxnorm_path.exists():

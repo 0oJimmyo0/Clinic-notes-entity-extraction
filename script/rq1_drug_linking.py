@@ -81,9 +81,12 @@ def load_alias_map(path: Path) -> Dict[str, str]:
         return {}
     raw = json.loads(path.read_text(encoding="utf-8"))
     out = {}
+    if not isinstance(raw, dict):
+        return out
     for k, v in raw.items():
+        canonical = v.get("canonical") if isinstance(v, dict) else v
         nk = normalize_drug_text(k)
-        nv = normalize_drug_text(v)
+        nv = normalize_drug_text(canonical)
         if nk and nv:
             out[nk] = nv
     return out
@@ -788,4 +791,3 @@ def summarize_link_diagnostics(diags: Sequence[Dict[str, dict]]) -> Dict[str, fl
     total = out.get("n_total", 0.0)
     out["accept_rate"] = (out.get("n_accepted", 0.0) / total) if total else 0.0
     return out
-

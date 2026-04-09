@@ -555,8 +555,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--drug-aliases-json",
-        default="resources/lexicons/rq1_drug_aliases.json",
-        help="Alias map JSON used by deterministic drug normalization.",
+        default="resources/manual/pathA_alias_map.json",
+        help="Alias map JSON used by deterministic drug normalization. Supports flat or structured Path A JSON.",
     )
     p.add_argument(
         "--output-link-diagnostics-csv",
@@ -708,4 +708,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

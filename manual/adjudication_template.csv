@@ -1,0 +1,1 @@
+adjudication_unit_id,person_id,visit_id,note_id,span_id_or_local_reference,raw_mention_text,adjudicated_canonical_label,mention_status,compare_to_structured_ehr,reviewer_notes

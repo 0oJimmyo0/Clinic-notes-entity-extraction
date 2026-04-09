@@ -1,0 +1,20 @@
+term,exclusion_reason,suggested_handling
+folfox,Regimen abbreviation rather than a single drug,regimen_not_drug
+folfiri,Regimen abbreviation rather than a single drug,regimen_not_drug
+ac,Short regimen abbreviation and highly ambiguous,too_ambiguous
+tc,Short regimen abbreviation and highly ambiguous,too_ambiguous
+carbo,Partial shorthand that often appears in multi-drug regimen context,needs_context
+bev,Short shorthand that should not be auto-expanded without local validation,leave_unresolved_for_pathB
+pembro,Common shorthand but not yet validated as deterministic local usage,leave_unresolved_for_pathB
+nivo,Common shorthand but not yet validated as deterministic local usage,leave_unresolved_for_pathB
+carbo/taxol,Slash-delimited multi-drug shorthand rather than a single alias,needs_context
+immunotherapy,Drug class or treatment class rather than a drug,class_not_drug
+endocrine therapy,Drug class or treatment class rather than a drug,class_not_drug
+aromatase inhibitor,Drug class rather than a specific drug,class_not_drug
+taxane,Drug class rather than a specific drug,class_not_drug
+platinum,Drug class rather than a specific drug,class_not_drug
+her2 therapy,Treatment class rather than a specific drug,class_not_drug
+maintenance,Too vague without a specific drug anchor,needs_context
+tx,Overloaded abbreviation that is not safe to interpret as a drug,too_ambiguous
+chemo,Generic therapy label rather than a drug,class_not_drug
+current regimen,Template or narrative noise rather than a drug mention,ignore_noise

@@ -1,0 +1,176 @@
+{
+  "adriamycin": {
+    "canonical": "doxorubicin",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Widely used brand name with stable one-to-one ingredient mapping."
+  },
+  "arimidex": {
+    "canonical": "anastrozole",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "aromasin": {
+    "canonical": "exemestane",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "avastin": {
+    "canonical": "bevacizumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "cytoxan": {
+    "canonical": "cyclophosphamide",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "faslodex": {
+    "canonical": "fulvestrant",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "femara": {
+    "canonical": "letrozole",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "gemzar": {
+    "canonical": "gemcitabine",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "herceptin": {
+    "canonical": "trastuzumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "ibrance": {
+    "canonical": "palbociclib",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "kadcyla": {
+    "canonical": "ado trastuzumab emtansine",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Keep the specific ADC ingredient name; do not collapse to trastuzumab."
+  },
+  "keytruda": {
+    "canonical": "pembrolizumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "kisqali": {
+    "canonical": "ribociclib",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "lupron": {
+    "canonical": "leuprolide",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Normalize to core ingredient rather than salt-specific product wording such as leuprolide acetate."
+  },
+  "neulasta": {
+    "canonical": "pegfilgrastim",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable supportive-care brand-to-ingredient mapping."
+  },
+  "opdivo": {
+    "canonical": "nivolumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "perjeta": {
+    "canonical": "pertuzumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "prolia": {
+    "canonical": "denosumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Safe under ingredient-level policy even though product indication differs from Xgeva."
+  },
+  "taxol": {
+    "canonical": "paclitaxel",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "taxotere": {
+    "canonical": "docetaxel",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "tecentriq": {
+    "canonical": "atezolizumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "temodar": {
+    "canonical": "temozolomide",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand frequently seen in treatment-context neuro-oncology notes."
+  },
+  "verzenio": {
+    "canonical": "abemaciclib",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "xeloda": {
+    "canonical": "capecitabine",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "xgeva": {
+    "canonical": "denosumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Safe under ingredient-level policy even though product indication differs from Prolia."
+  },
+  "xtandi": {
+    "canonical": "enzalutamide",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "yervoy": {
+    "canonical": "ipilimumab",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "zoladex": {
+    "canonical": "goserelin",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Stable oncology brand-to-ingredient mapping."
+  },
+  "zytiga": {
+    "canonical": "abiraterone",
+    "type": "brand_to_generic",
+    "confidence": "high",
+    "notes": "Normalize to core ingredient rather than the product wording abiraterone acetate."
+  }
+}

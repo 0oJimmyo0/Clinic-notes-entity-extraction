@@ -65,8 +65,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--alias-json",
-        default="resources/lexicons/rq1_drug_aliases.json",
-        help="Path A alias map JSON.",
+        default="resources/manual/pathA_alias_map.json",
+        help="Path A alias map JSON, either flat or structured.",
     )
     p.add_argument(
         "--canonical-vocab-path",
