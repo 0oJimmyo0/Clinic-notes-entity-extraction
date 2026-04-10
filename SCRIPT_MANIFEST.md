@@ -1,7 +1,7 @@
 # Script Manifest
 
 ## Active Pipeline
-1. `script/run_select_note_corpus.py` - build eligible note cohort and adjudication/downstream manifests.
+1. `script/run_select_note_corpus.py` - build clinic-note-only eligible cohort and adjudication/downstream manifests (mixed-note optional via `--include-non-clinic-notes`).
 2. `script/run_attach_full_note_text.py` - attach full-note payload for context recovery.
 3. `script/run_candidates_overnight.py` - treatment-context candidate generation.
 4. `script/run_stage2_overnight.py` - stage-2 medication/context extraction.
@@ -14,7 +14,7 @@
 11. `script/run_rq1_step4b_calibrate_pathb.py` - Path B confidence calibration on adjudicated leftovers.
 12. `script/run_rq1_step5_normalization_eval.py` - baseline vs Path A vs Path B canonical-label evaluation.
 13. `script/run_rq1_step6_downstream_concordance.py` - secondary note-to-EHR concordance on adjudicated comparable mentions.
-14. `script/run_rq1_step5_make_outputs.py` - paper-ready tables and figures for the layered workflow.
+14. `script/run_rq1_step5_make_outputs.py` - paper-ready tables and figures for the layered workflow (clinic-note-only cohort labels by default).
 
 ## Active Helper Modules and Utilities
 - `script/rq1_drug_linking.py` - deterministic Path A and transparent Path B linking primitives.

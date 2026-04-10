@@ -2,6 +2,10 @@
 
 This repository contains an adjudication-first, treatment-context medication extraction workflow for clinic notes.
 
+Main pipeline default:
+- clinic-note-only cohort filtering is enabled by default in `script/run_select_note_corpus.py`
+- mixed-note runs are optional secondary analyses via `--include-non-clinic-notes`
+
 Primary study objective:
 - evaluate extraction and normalization against an adjudicated, note-grounded reference set
 
@@ -18,9 +22,9 @@ Historical scripts and plans are preserved under:
 - `doc/legacy/`
 
 ## Paper Cohorts
-1. Full Eligible Cohort
-2. Downstream Evaluation Cohort
-3. Adjudication Subset
+1. Clinic-Only Full Eligible Cohort
+2. Clinic-Only Downstream Evaluation Cohort
+3. Clinic-Only Adjudication Subset
 
 ## Active Workflow Map
 1. `script/run_select_note_corpus.py`

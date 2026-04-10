@@ -40,6 +40,18 @@ import numpy as np
 import pandas as pd
 
 
+DEFAULT_CLINIC_NOTE_TYPES = [
+    "Progress Notes",
+    "Assessment & Plan Note",
+    "Patient Instructions",
+    "H&P",
+    "H&P (View-Only)",
+    "Research Coordinator Notes",
+    "Consults",
+    "Discharge Instructions",
+]
+
+
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Define visit-level corpora for downstream concordance and adjudication")
     ap.add_argument("--notes-dir", type=Path, default=Path("episode_notes"))
@@ -77,8 +89,16 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--min-note-chars", type=int, default=20)
     ap.add_argument(
         "--allowed-note-types",
-        default="",
-        help="Comma-separated note_title values to include; empty means all",
+        default=",".join(DEFAULT_CLINIC_NOTE_TYPES),
+        help=(
+            "Comma-separated note_title values to include. "
+            "Defaults to clinic-like note titles for the active main pipeline."
+        ),
+    )
+    ap.add_argument(
+        "--include-non-clinic-notes",
+        action="store_true",
+        help="Optional legacy mode: disable note-type filtering and include all note types.",
     )
     ap.add_argument("--exclude-template-only", action="store_true")
     ap.add_argument(
@@ -280,10 +300,12 @@ def main() -> None:
     work = work[work["note_len"] >= args.min_note_chars].copy()
     summary["notes_after_min_chars"] = int(len(work))
 
-    if args.allowed_note_types.strip():
-        allowed = {x.strip().lower() for x in args.allowed_note_types.split(",") if x.strip()}
-        work = work[work["note_title_norm"].str.lower().isin(allowed)].copy()
+    clinic_types = {x.strip().lower() for x in args.allowed_note_types.split(",") if x.strip()}
+    if (not args.include_non_clinic_notes) and clinic_types:
+        work = work[work["note_title_norm"].str.lower().isin(clinic_types)].copy()
     summary["notes_after_note_type_filter"] = int(len(work))
+
+    work["is_clinic_like_note"] = work["note_title_norm"].str.lower().isin(clinic_types) if clinic_types else False
 
     if args.exclude_template_only:
         work = work[~work["note_text"].map(_is_template_like)].copy()
@@ -355,6 +377,7 @@ def main() -> None:
             note_type_mode=("note_title_norm", lambda x: x.mode().iat[0] if len(x.mode()) else "<UNKNOWN_NOTE_TYPE>"),
             median_note_len=("note_len", "median"),
             max_note_len=("note_len", "max"),
+            is_clinic_like_visit=("is_clinic_like_note", "max"),
         )
     )
 
@@ -437,10 +460,10 @@ def main() -> None:
     adjud_notes = work.merge(adjud_visit_keys, on=["person_id", "visit_occurrence_id"], how="inner")
 
     eval_note_manifest = eval_notes[
-        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]
+        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len", "is_clinic_like_note"]
     ].copy()
     adjud_note_manifest = adjud_notes[
-        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len"]
+        ["person_id", "visit_occurrence_id", "note_id", "note_title_norm", "note_len", "is_clinic_like_note"]
     ].copy()
 
     # Write outputs.
@@ -475,6 +498,7 @@ def main() -> None:
                 "note_len",
                 "note_text",
                 "source_note_text_col",
+                "is_clinic_like_note",
             ]
             if c in work.columns
         ]
@@ -497,6 +521,10 @@ def main() -> None:
             "write_cohort_note_parquet": write_note_parquet,
             "require_candidates_for_adjudication": bool(args.require_candidates_for_adjudication),
             "require_structured_drugs_for_downstream": bool(args.require_structured_drugs_for_downstream),
+            "clinic_note_only_main_pipeline": bool(not args.include_non_clinic_notes),
+            "clinic_note_types": sorted(clinic_types),
+            "full_eligible_clinic_like_notes": int(work["is_clinic_like_note"].sum()),
+            "full_eligible_non_clinic_like_notes": int((~work["is_clinic_like_note"]).sum()),
             "output_files": {
                 "full_visit_eligible_manifest": str(full_visit_path),
                 "evaluation_visit_manifest": str(eval_visit_path),

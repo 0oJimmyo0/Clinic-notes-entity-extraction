@@ -1,6 +1,6 @@
 PROJECT GOAL
 
-Build an adjudication-first, note-grounded evaluation pipeline for treatment-context medication extraction in clinic notes.
+Build an adjudication-first, note-grounded evaluation pipeline for treatment-context medication extraction in clinic notes, with clinic-note-only cohorts as the primary study surface.
 
 PRIMARY STUDY CLAIM
 
@@ -17,7 +17,7 @@ FINAL STUDY SCOPE
 - primary domain: drugs only
 - primary truth source: adjudicated note reference set built from mention packets, LLM-assisted drafting, and human review
 - downstream structured EHR: concordance target only
-- note scope: treatment-context medication extraction study
+- note scope: clinic-note-only treatment-context medication extraction study
 - note handling: preserve full note text when available for candidate discovery and context recovery, but keep adjudication focused on medication mentions plus enough local/full-note context to judge meaning
 
 PAPER LAYERS
@@ -53,9 +53,9 @@ PAPER LAYERS
 
 PAPER COHORTS (FIXED)
 
-1. Full Eligible Cohort
-2. Downstream Evaluation Cohort
-3. Adjudication Subset
+1. Clinic-Only Full Eligible Cohort
+2. Clinic-Only Downstream Evaluation Cohort
+3. Clinic-Only Adjudication Subset
 
 WHAT THE REPO SHOULD CONTINUE TO PRESERVE
 
@@ -64,6 +64,11 @@ WHAT THE REPO SHOULD CONTINUE TO PRESERVE
 - cohort manifests and note traceability
 - visit-level downstream concordance code
 - deterministic Path A and explicit unresolved leftovers
+
+SECONDARY/OPTIONAL ANALYSES
+
+- mixed-note (clinic + non-clinic) runs may be executed as secondary sensitivity analyses only
+- mixed-note outputs should be stored in separate artifact roots and should not replace the clinic-note-only main outputs
 
 WHAT THE REPO SHOULD NO LONGER PRESENT AS PRIMARY EVALUATION
 

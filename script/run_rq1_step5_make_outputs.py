@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--downstream-summary-csv", default="episode_extraction_results/rq1/downstream_concordance/rq1_similarity_summary.csv")
     p.add_argument("--pathb-leftovers-csv", default="episode_extraction_results/rq1/adjudicated/rq1_pathb_leftovers.csv")
     p.add_argument("--status-confusion-csv", default="episode_extraction_results/rq1/note_truth_eval/rq1_step4_status_confusion.csv")
+    p.add_argument(
+        "--cohort-scope-label",
+        default="clinic_only",
+        help="Label prefix describing cohort scope used in cohort table outputs.",
+    )
     p.add_argument("--output-dir", default="episode_extraction_results/rq1/paper_outputs")
     return p.parse_args()
 
@@ -76,19 +81,19 @@ def main() -> int:
     cohort_table = pd.DataFrame(
         [
             {
-                "cohort": "full_eligible_cohort",
+                "cohort": f"{args.cohort_scope_label}_full_eligible_cohort",
                 "patients": cohort_summary.get("full_eligible_patients", 0),
                 "visits": cohort_summary.get("full_eligible_visits", 0),
                 "notes": cohort_summary.get("notes_after_dedup_text_within_visit", 0),
             },
             {
-                "cohort": "downstream_evaluation_cohort",
+                "cohort": f"{args.cohort_scope_label}_downstream_evaluation_cohort",
                 "patients": cohort_summary.get("evaluation_patients", 0),
                 "visits": cohort_summary.get("evaluation_visits", 0),
                 "notes": "",
             },
             {
-                "cohort": "adjudication_subset",
+                "cohort": f"{args.cohort_scope_label}_adjudication_subset",
                 "patients": cohort_summary.get("adjudication_patients", 0),
                 "visits": cohort_summary.get("adjudication_visits", 0),
                 "notes": "",

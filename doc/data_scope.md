@@ -11,6 +11,11 @@ The intended scope is narrow:
 - note-grounded adjudication as the truth source
 - downstream structured EHR comparison only after adjudication
 
+Default active scope:
+
+- clinic-note-only cohorts are the primary pipeline outputs
+- mixed-note cohorts are optional secondary analyses and must be isolated in separate artifact roots
+
 ## Note Scope Clarification
 
 The study should not be described as a broad full-note medication extraction benchmark.
@@ -31,17 +36,17 @@ Therefore:
 
 ## Corpus Layers
 
-### Full eligible cohort
+### Clinic-only full eligible cohort
 
-- all cleaned eligible notes/visits after note-quality filtering and deduplication
+- all cleaned eligible clinic-like notes/visits after note-quality filtering and deduplication
 - used for infrastructure and downstream cohort construction
 
-### Downstream evaluation cohort
+### Clinic-only downstream evaluation cohort
 
 - visit/patient subset used for secondary note-to-EHR concordance
 - evaluated only after adjudication comparability filtering
 
-### Adjudication subset
+### Clinic-only adjudication subset
 
 - note/visit subset used for mention-level LLM plus human review
 - enriched for treatment-context relevance and difficult cases
