@@ -51,6 +51,12 @@ PAPER LAYERS
    - only on adjudicated note mentions marked comparable to structured EHR
    - this is a secondary documentation concordance analysis, not the extraction truth criterion
 
+PAPER COHORTS (FIXED)
+
+1. Full Eligible Cohort
+2. Downstream Evaluation Cohort
+3. Adjudication Subset
+
 WHAT THE REPO SHOULD CONTINUE TO PRESERVE
 
 - the current candidate extraction backbone

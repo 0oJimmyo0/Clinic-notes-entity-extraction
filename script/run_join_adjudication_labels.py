@@ -35,12 +35,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--alias-artifact",
-        default="resources/lexicons/rq1_drug_aliases.csv",
+        default="lexicons/rq1_drug_aliases.csv",
         help="Path A alias CSV/JSON.",
     )
     p.add_argument(
         "--canonical-vocab-path",
-        default="resources/lexicons/rq1_drug_canonical_vocab.csv",
+        default="lexicons/rq1_drug_canonical_vocab.csv",
         help="Optional canonical vocabulary used to flag Path A leftovers.",
     )
     p.add_argument(
@@ -100,7 +100,7 @@ def _build_seed_indexes(seed_df: pd.DataFrame) -> Tuple[Dict[str, int], Dict[Tup
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     packets_path = (root / args.packets_mentions_csv).resolve()
     reviewed_path = (root / args.reviewed_adjudication_csv).resolve() if args.reviewed_adjudication_csv else packets_path
     alias_path = (root / args.alias_artifact).resolve()

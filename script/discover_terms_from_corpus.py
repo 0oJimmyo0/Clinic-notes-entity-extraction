@@ -10,10 +10,10 @@ Usage:
   python discover_terms_from_corpus.py --seeds PATH --corpus-dir PATH --output PATH [options]
 
 Example:
-  python resources/script/discover_terms_from_corpus.py \\
-    --seeds resources/lexicons/candidate_treatment_actions__stop.csv \\
+  python script/discover_terms_from_corpus.py \\
+    --seeds lexicons/candidate_treatment_actions__stop.csv \\
     --corpus-dir data/notes_txt \\
-    --output resources/lexicons/candidate_treatment_actions__stop_expanded.csv
+    --output lexicons/candidate_treatment_actions__stop_expanded.csv
 """
 
 from __future__ import annotations

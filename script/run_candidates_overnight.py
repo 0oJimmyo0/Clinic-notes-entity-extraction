@@ -10,7 +10,7 @@ Key features:
 - Lightweight state file with elapsed time and failures
 
 Example:
-  nohup python "resources/script/run_candidates_overnight.py" \
+  nohup python "script/run_candidates_overnight.py" \
     --chunk-dir "episode_notes" \
     --output-dir "episode_extraction_results" \
     --chunk-prefix "episode_notes_chunk" \
@@ -441,7 +441,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help='Optional explicit chunk names without extension (e.g., "episode_notes_chunk000").',
     )
-    parser.add_argument("--lexicon-dir", default="resources/lexicons", help="Lexicon directory.")
+    parser.add_argument("--lexicon-dir", default="lexicons", help="Lexicon directory.")
     parser.add_argument("--output-dir", default="episode_extraction_results", help="Output directory.")
     parser.add_argument(
         "--max-candidates-per-patient",
@@ -468,7 +468,7 @@ def main() -> int:
     args = parse_args()
     note_text_cols = [x.strip() for x in str(args.note_text_col_candidates).split(",") if x.strip()]
 
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = Path(__file__).resolve().parents[1]
     chunk_dir = (project_root / args.chunk_dir).resolve()
     lexicon_dir = (project_root / args.lexicon_dir).resolve()
     output_dir = (project_root / args.output_dir).resolve()

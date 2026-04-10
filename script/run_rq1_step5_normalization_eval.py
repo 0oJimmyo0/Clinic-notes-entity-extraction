@@ -31,12 +31,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--alias-artifact",
-        default="resources/lexicons/rq1_drug_aliases.csv",
+        default="lexicons/rq1_drug_aliases.csv",
         help="Path A alias CSV/JSON.",
     )
     p.add_argument(
         "--canonical-vocab-path",
-        default="resources/lexicons/rq1_drug_canonical_vocab.csv",
+        default="lexicons/rq1_drug_canonical_vocab.csv",
         help="Canonical vocabulary for Path B candidate universe.",
     )
     p.add_argument("--pathb-top-k", type=int, default=20)
@@ -87,7 +87,7 @@ def _error_bucket(row: Dict[str, object]) -> str:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     adjud_path = (root / args.adjudicated_mentions_csv).resolve()
     alias_path = (root / args.alias_artifact).resolve()
     vocab_path = (root / args.canonical_vocab_path).resolve() if args.canonical_vocab_path else None

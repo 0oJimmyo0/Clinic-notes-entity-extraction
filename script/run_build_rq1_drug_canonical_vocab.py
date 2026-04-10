@@ -125,12 +125,12 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build canonical drug vocabulary table for RQ1 Path B.")
     p.add_argument(
         "--alias-json",
-        default="resources/lexicons/rq1_drug_aliases.csv",
+        default="lexicons/rq1_drug_aliases.csv",
         help="Path A alias artifact, either CSV or JSON.",
     )
     p.add_argument(
         "--rxnorm-terms-csv",
-        default="resources/lexicons/ehr_entities__drugs.csv",
+        default="lexicons/ehr_entities__drugs.csv",
         help="Public-source drug term CSV (single term column), often generated from RxNorm utilities.",
     )
     p.add_argument(
@@ -161,12 +161,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--output-vocab-csv",
-        default="resources/lexicons/rq1_drug_canonical_vocab.csv",
+        default="lexicons/rq1_drug_canonical_vocab.csv",
         help="Output canonical vocabulary CSV.",
     )
     p.add_argument(
         "--output-review-csv",
-        default="resources/lexicons/rq1_drug_unresolved_review_queue.csv",
+        default="lexicons/rq1_drug_unresolved_review_queue.csv",
         help="Output unresolved review queue CSV.",
     )
     return p.parse_args()
@@ -174,7 +174,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
 
     alias_path = (root / args.alias_json).resolve()
     rxnorm_path = (root / args.rxnorm_terms_csv).resolve()

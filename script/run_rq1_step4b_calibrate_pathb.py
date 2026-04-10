@@ -51,7 +51,7 @@ def _band_metrics(df: pd.DataFrame, value_col: str, bands: List[tuple[float, flo
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     detail_path = (root / args.normalization_detailed_csv).resolve()
     out_dir = (root / args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)

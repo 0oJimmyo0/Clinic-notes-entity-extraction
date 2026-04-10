@@ -36,11 +36,10 @@ Therefore:
 - all cleaned eligible notes/visits after note-quality filtering and deduplication
 - used for infrastructure and downstream cohort construction
 
-### Patient-complete paper subcohort
+### Downstream evaluation cohort
 
-- selected at the patient level
-- keeps all cleaned visits and notes for selected patients
-- designed to stay within a practical paper-scale note budget while preserving longitudinal context
+- visit/patient subset used for secondary note-to-EHR concordance
+- evaluated only after adjudication comparability filtering
 
 ### Adjudication subset
 

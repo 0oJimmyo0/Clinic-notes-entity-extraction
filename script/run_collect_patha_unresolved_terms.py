@@ -65,7 +65,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--alias-json",
-        default="resources/lexicons/rq1_drug_aliases.csv",
+        default="lexicons/rq1_drug_aliases.csv",
         help="Path A alias artifact, either CSV or JSON.",
     )
     p.add_argument(
@@ -100,7 +100,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
 
     note_path = (root / args.note_csv).resolve()
     alias_path = (root / args.alias_json).resolve()

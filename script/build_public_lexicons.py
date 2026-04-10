@@ -3,7 +3,7 @@
 Downloader + builder for public clinical vocabularies.
 
 Outputs lexicon files expected by data_brief.ipynb under:
-  resources/lexicons/
+  lexicons/
 
 Design:
 - Tries fully automated downloads where possible.
@@ -26,7 +26,7 @@ from urllib.error import URLError, HTTPError
 from urllib.request import urlopen, urlretrieve
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = PROJECT_ROOT / "resources" / "terminologies" / "raw"
 LEXICON_DIR = PROJECT_ROOT / "resources" / "lexicons"
 # If this dir exists with NCIt, the build step will delegate to process_raw_vocabularies (Option A).
@@ -358,7 +358,7 @@ def default_action_terms() -> dict[str, list[str]]:
 
 
 def cmd_build(_: argparse.Namespace) -> int:
-    # If Option A layout exists (resources/raw with NCIt), use the processor so treatment
+    # If Option A layout exists (raw with NCIt), use the processor so treatment
     # actions and other reasons come from NCIt/CDISC instead of built-in lists only.
     ncit_path = PROCESSOR_RAW_DIR / "NCIt" / "Thesaurus.txt"
     if PROCESSOR_RAW_DIR.exists() and ncit_path.exists():
@@ -476,7 +476,7 @@ def cmd_build(_: argparse.Namespace) -> int:
         "counts": counts,
         "notes": [
             "If counts are very low, check missing raw files in resources/terminologies/raw/",
-            "Run: python resources/script/build_public_lexicons.py download",
+            "Run: python script/build_public_lexicons.py download",
             "Then manually place login-required files (LOINC, optional CTCAE/ICD10PCS), and run build.",
         ],
     }

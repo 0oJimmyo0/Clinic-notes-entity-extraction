@@ -18,7 +18,6 @@ from rq1_adjudication_utils import write_run_summary
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build layered paper outputs for RQ1.")
     p.add_argument("--cohort-summary-json", default="episode_notes/manifests/cohort_justification_summary.json")
-    p.add_argument("--subcohort-summary-json", default="episode_notes/subcohort_patient_complete/summary.json")
     p.add_argument("--note-truth-summary-json", default="episode_extraction_results/rq1/note_truth_eval/rq1_step4_note_truth_summary.json")
     p.add_argument("--adjudicated-mentions-csv", default="episode_extraction_results/rq1/adjudicated/rq1_adjudicated_mentions.csv")
     p.add_argument("--normalization-summary-json", default="episode_extraction_results/rq1/normalization_eval/rq1_normalization_eval_summary.json")
@@ -51,12 +50,11 @@ def _write_table(df: pd.DataFrame, out_dir: Path, stem: str) -> None:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     out_dir = (root / args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cohort_summary = _load_json((root / args.cohort_summary_json).resolve())
-    subcohort_summary = _load_json((root / args.subcohort_summary_json).resolve())
     note_truth_summary = _load_json((root / args.note_truth_summary_json).resolve())
     norm_summary = _load_json((root / args.normalization_summary_json).resolve())
     pathb_summary = _load_json((root / args.pathb_calibration_summary_json).resolve())
@@ -78,19 +76,13 @@ def main() -> int:
     cohort_table = pd.DataFrame(
         [
             {
-                "cohort": "full_eligible_visit_cohort",
+                "cohort": "full_eligible_cohort",
                 "patients": cohort_summary.get("full_eligible_patients", 0),
                 "visits": cohort_summary.get("full_eligible_visits", 0),
                 "notes": cohort_summary.get("notes_after_dedup_text_within_visit", 0),
             },
             {
-                "cohort": "patient_complete_paper_subcohort",
-                "patients": subcohort_summary.get("selected_patients", 0),
-                "visits": subcohort_summary.get("selected_visits", 0),
-                "notes": subcohort_summary.get("selected_notes", 0),
-            },
-            {
-                "cohort": "downstream_structured_eval_cohort",
+                "cohort": "downstream_evaluation_cohort",
                 "patients": cohort_summary.get("evaluation_patients", 0),
                 "visits": cohort_summary.get("evaluation_visits", 0),
                 "notes": "",
@@ -223,7 +215,6 @@ def main() -> int:
         {
             "inputs": {
                 "cohort_summary_json": args.cohort_summary_json,
-                "subcohort_summary_json": args.subcohort_summary_json,
                 "note_truth_summary_json": args.note_truth_summary_json,
                 "adjudicated_mentions_csv": args.adjudicated_mentions_csv,
                 "normalization_summary_json": args.normalization_summary_json,

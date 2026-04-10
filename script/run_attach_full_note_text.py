@@ -10,7 +10,7 @@ Input requirements for full text source:
 - must contain a full text column (default: note_text)
 
 Example:
-  python resources/script/run_attach_full_note_text.py \
+  python script/run_attach_full_note_text.py \
     --notes-dir episode_notes \
     --glob 'episode_notes_chunk*.parquet' \
     --full-text-source '/path/to/full_notes.parquet' \

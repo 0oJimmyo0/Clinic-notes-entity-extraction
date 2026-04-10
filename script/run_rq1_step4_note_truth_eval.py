@@ -70,7 +70,7 @@ def _slice_metrics(df: pd.DataFrame, slice_col: str) -> pd.DataFrame:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     join_path = (root / args.joined_mentions_csv).resolve()
     visit_path = (root / args.visit_manifest_csv).resolve()
     note_path = (root / args.note_manifest_csv).resolve()

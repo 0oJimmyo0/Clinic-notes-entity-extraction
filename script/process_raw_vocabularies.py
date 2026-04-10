@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Process raw vocabulary files in resources/raw into medspaCy-ready lexicons.
+Process raw vocabulary files in raw into medspaCy-ready lexicons.
 
 Raw sources can be zips or extracted folders; this script auto-detects layout
-and parses each format into a single "term" column CSV under resources/lexicons/.
+and parses each format into a single "term" column CSV under lexicons/.
 
 Usage:
-  python resources/script/process_raw_vocabularies.py [--raw-dir PATH] [--lexicon-dir PATH]
+  python script/process_raw_vocabularies.py [--raw-dir PATH] [--lexicon-dir PATH]
 
 Default:
-  --raw-dir      resources/raw
-  --lexicon-dir  resources/lexicons
+  --raw-dir      raw
+  --lexicon-dir  lexicons
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RAW = PROJECT_ROOT / "resources" / "raw"
 DEFAULT_LEXICON = PROJECT_ROOT / "resources" / "lexicons"
 
@@ -583,7 +583,7 @@ def run(raw_dir: Path, lexicon_dir: Path) -> dict[str, int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Process raw vocabularies into medspaCy lexicons")
-    ap.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW, help="Raw vocabulary root (e.g. resources/raw)")
+    ap.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW, help="Raw vocabulary root (e.g. raw)")
     ap.add_argument("--lexicon-dir", type=Path, default=DEFAULT_LEXICON, help="Output lexicon directory")
     args = ap.parse_args()
     counts, source = run(args.raw_dir, args.lexicon_dir)

@@ -4,12 +4,12 @@ Overnight Stage-2 runner: medspaCy extraction on combined candidate spans.
 
 What it does:
 - Loads `all_candidates_combined.csv` (or another candidates CSV)
-- Builds medspaCy TargetRules from lexicons under resources/lexicons
+- Builds medspaCy TargetRules from lexicons under lexicons
 - Runs extraction in batches with nlp.pipe
 - Writes checkpointed output CSV and state JSON for resume
 
 Example:
-  nohup python3 "resources/script/run_stage2_overnight.py" \
+  nohup python3 "script/run_stage2_overnight.py" \
     --input-csv "episode_extraction_results/all_candidates_combined.csv" \
     --output-csv "episode_extraction_results/extracted_treatment_data_episode_cleaned.csv" \
     --state-file "episode_extraction_results/stage2_run_state.json" \
@@ -336,7 +336,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--lexicon-dir",
-        default="resources/lexicons",
+        default="lexicons",
         help="Lexicon directory.",
     )
     parser.add_argument("--batch-size", type=int, default=128, help="nlp.pipe batch size.")
@@ -358,7 +358,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     in_csv = (root / args.input_csv).resolve()
     out_csv = (root / args.output_csv).resolve()
     state_file = (root / args.state_file).resolve()

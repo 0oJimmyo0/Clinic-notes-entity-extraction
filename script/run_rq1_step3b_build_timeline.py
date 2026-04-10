@@ -89,7 +89,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
 
     visits_path = (root / args.visits_path).resolve()
     out_path = (root / args.output_csv).resolve()

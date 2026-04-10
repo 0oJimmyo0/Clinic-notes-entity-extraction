@@ -55,6 +55,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also write JSONL rows for optional LLM-assisted draft labeling.",
     )
+    p.add_argument(
+        "--min-context-chars",
+        type=int,
+        default=40,
+        help="Minimum context length considered sufficient for reviewer packet quality diagnostics.",
+    )
     return p.parse_args()
 
 
@@ -106,7 +112,7 @@ def _stage2_seed_lookup(stage2: pd.DataFrame) -> Dict[Tuple[str, str, str, str, 
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
 
     subset_path = (root / args.adjudication_subset_csv).resolve()
     candidate_path = (root / args.candidate_csv).resolve()
@@ -155,6 +161,8 @@ def main() -> int:
     for (pid, vid, nid), g in grouped_note:
         note_meta = note_lookup.get(str(nid))
         note_text = str(getattr(note_meta, "note_text", "") or "")
+        note_found = bool(note_meta is not None)
+        full_note_attached = bool(note_text.strip())
         note_rows.append(
             {
                 "packet_note_id": stable_id(pid, vid, nid, prefix="notepkt_"),
@@ -167,6 +175,8 @@ def main() -> int:
                 "candidate_categories_json": json.dumps(sorted(set(g["category"].astype(str).tolist()))),
                 "candidate_span_examples_json": json.dumps(g["span_text"].astype(str).head(5).tolist()),
                 "seed_note_text_excerpt": note_text[:2000],
+                "note_found_in_source": int(note_found),
+                "full_note_text_attached": int(full_note_attached),
             }
         )
 
@@ -238,11 +248,81 @@ def main() -> int:
     mention_df = pd.DataFrame(mention_rows)
     note_packet_df = pd.DataFrame(note_rows).drop_duplicates(subset=["packet_note_id"])
 
+    # Packet quality diagnostics for pre-adjudication validation.
+    mention_df["context_text"] = mention_df.get("context_text", "").fillna("").astype(str)
+    mention_df["context_char_len"] = mention_df["context_text"].str.len()
+    mention_df["context_present"] = mention_df["context_char_len"] > 0
+    mention_df["context_sufficient"] = mention_df["context_char_len"] >= max(int(args.min_context_chars), 1)
+
+    mention_per_note = mention_df.groupby("note_id").size().rename("mention_count").reset_index()
+    mention_per_visit = mention_df.groupby(["person_id", "visit_id"]).size().rename("mention_count").reset_index()
+
+    def _dist_payload(s: pd.Series) -> Dict[str, float]:
+        if s is None or len(s) == 0:
+            return {
+                "min": 0.0,
+                "p25": 0.0,
+                "p50": 0.0,
+                "p75": 0.0,
+                "p90": 0.0,
+                "p95": 0.0,
+                "p99": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+            }
+        vals = s.astype(float)
+        return {
+            "min": float(vals.min()),
+            "p25": float(vals.quantile(0.25)),
+            "p50": float(vals.quantile(0.50)),
+            "p75": float(vals.quantile(0.75)),
+            "p90": float(vals.quantile(0.90)),
+            "p95": float(vals.quantile(0.95)),
+            "p99": float(vals.quantile(0.99)),
+            "max": float(vals.max()),
+            "mean": float(vals.mean()),
+        }
+
+    n_note_packets = int(len(note_packet_df))
+    n_notes_with_source = int(note_packet_df.get("note_found_in_source", pd.Series(dtype=int)).sum()) if n_note_packets else 0
+    n_notes_with_full = int(note_packet_df.get("full_note_text_attached", pd.Series(dtype=int)).sum()) if n_note_packets else 0
+
+    packet_diag = {
+        "counts": {
+            "mention_packets": int(len(mention_df)),
+            "unique_notes": int(mention_df["note_id"].nunique()) if len(mention_df) else 0,
+            "unique_visits": int(mention_df[["person_id", "visit_id"]].drop_duplicates().shape[0]) if len(mention_df) else 0,
+        },
+        "mention_frequency_distribution": {
+            "per_note": _dist_payload(mention_per_note["mention_count"] if len(mention_per_note) else pd.Series(dtype=float)),
+            "per_visit": _dist_payload(mention_per_visit["mention_count"] if len(mention_per_visit) else pd.Series(dtype=float)),
+        },
+        "context_quality": {
+            "context_present_n": int(mention_df["context_present"].sum()) if len(mention_df) else 0,
+            "context_present_rate": float(mention_df["context_present"].mean()) if len(mention_df) else 0.0,
+            "context_sufficient_n": int(mention_df["context_sufficient"].sum()) if len(mention_df) else 0,
+            "context_sufficient_rate": float(mention_df["context_sufficient"].mean()) if len(mention_df) else 0.0,
+            "min_context_chars_threshold": int(max(int(args.min_context_chars), 1)),
+        },
+        "full_note_attachment": {
+            "note_packets": n_note_packets,
+            "notes_found_in_source_n": n_notes_with_source,
+            "full_note_attached_n": n_notes_with_full,
+            "full_note_attached_rate_overall": float(n_notes_with_full / n_note_packets) if n_note_packets else 0.0,
+            "full_note_attached_rate_when_note_found": float(n_notes_with_full / n_notes_with_source) if n_notes_with_source else 0.0,
+        },
+    }
+
     mention_path = out_dir / "adjudication_packets_mentions.csv"
     note_path = out_dir / "adjudication_packets_notes.csv"
     summary_path = out_dir / "adjudication_packets_manifest.json"
+    diag_path = out_dir / "adjudication_packets_diagnostics.json"
+    note_dist_path = out_dir / "adjudication_packets_mentions_per_note.csv"
+    visit_dist_path = out_dir / "adjudication_packets_mentions_per_visit.csv"
     mention_df.to_csv(mention_path, index=False)
     note_packet_df.to_csv(note_path, index=False)
+    mention_per_note.to_csv(note_dist_path, index=False)
+    mention_per_visit.to_csv(visit_dist_path, index=False)
 
     if args.write_jsonl:
         jsonl_path = out_dir / "adjudication_packets_mentions.jsonl"
@@ -270,9 +350,14 @@ def main() -> int:
             "outputs": {
                 "adjudication_packets_mentions_csv": str(mention_path),
                 "adjudication_packets_notes_csv": str(note_path),
+                "adjudication_packets_diagnostics_json": str(diag_path),
+                "adjudication_packets_mentions_per_note_csv": str(note_dist_path),
+                "adjudication_packets_mentions_per_visit_csv": str(visit_dist_path),
             },
         },
     )
+
+    write_run_summary(diag_path, packet_diag)
 
     print(f"Saved adjudication mention packets: {mention_path} (rows={len(mention_df):,})")
     print(f"Saved adjudication note packets: {note_path} (rows={len(note_packet_df):,})")

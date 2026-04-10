@@ -340,12 +340,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--icd-codes-path",
-        default="resources/raw/ICD-10-CM/Code Descriptions/icd10cm_codes_2026.txt",
+        default="raw/ICD-10-CM/Code Descriptions/icd10cm_codes_2026.txt",
         help="ICD-10-CM codes file for condition_source_value -> description mapping.",
     )
     p.add_argument(
         "--icd10pcs-order-path",
-        default="resources/raw/ICD-10-PCS/zip-file-4-2026-icd-10-pcs-order-file-long-and-abbreviated-titles/icd10pcs_order_2026.txt",
+        default="raw/ICD-10-PCS/zip-file-4-2026-icd-10-pcs-order-file-long-and-abbreviated-titles/icd10pcs_order_2026.txt",
         help="ICD-10-PCS order file for procedure_source_value -> long title mapping.",
     )
     return p.parse_args()
@@ -353,7 +353,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
 
     cond_path = (root / args.conditions_path).resolve()
     drug_path = (root / args.drugs_path).resolve()

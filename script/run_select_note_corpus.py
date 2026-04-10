@@ -16,7 +16,7 @@ Core outputs:
 - cohort_justification_summary.json
 
 Example:
-  python resources/script/run_select_note_corpus.py \
+  python script/run_select_note_corpus.py \
     --notes-dir episode_notes \
     --glob 'episode_notes_chunk*.parquet' \
     --candidate-csv episode_extraction_results/archive_candidates/all_candidates_combined.csv \

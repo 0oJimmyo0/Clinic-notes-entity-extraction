@@ -118,7 +118,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     summary_path, pairs_path, resolved_method = _resolve_method_files(
         root=root,
         method_label=args.method_label,
