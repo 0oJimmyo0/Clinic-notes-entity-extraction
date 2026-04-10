@@ -125,8 +125,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build canonical drug vocabulary table for RQ1 Path B.")
     p.add_argument(
         "--alias-json",
-        default="resources/manual/pathA_alias_map.json",
-        help="Path A alias JSON, either flat or structured.",
+        default="resources/lexicons/rq1_drug_aliases.csv",
+        help="Path A alias artifact, either CSV or JSON.",
     )
     p.add_argument(
         "--rxnorm-terms-csv",

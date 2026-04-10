@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
 """
-RQ1 drug linking utilities (Path A + Path B).
+RQ1 drug normalization and linking utilities.
 
-Path A:
-- deterministic normalization + alias canonicalization
+Primary paper-facing behavior:
+- Path A: deterministic normalization + alias canonicalization
+- Path B: abstaining linker over a canonical drug vocabulary
 
-Path B (redesigned, transparent):
-- only run on unresolved mentions after Path A
-- search against canonical drug universe (not same-visit EHR terms)
-- top-k lexical candidate retrieval
-- feature-based scoring
-- hard rejection/abstention rules
-- optional calibration for confidence-based accept/reject
-
-Legacy Path B mode is retained for backward compatibility:
+Legacy downstream concordance behavior is retained for backward compatibility:
+- same-visit note/EHR overlap helpers
 - embedding_cpu char-ngram linker
 """
 
 from __future__ import annotations
 
+import csv
 import json
 import math
 import re
@@ -76,17 +71,85 @@ def normalize_drug_text(term: str) -> str:
     return " ".join(toks[:4])
 
 
+def load_alias_entries(path: Path) -> List[Dict[str, str]]:
+    if not path.exists():
+        return []
+
+    suffix = path.suffix.lower()
+    rows: List[Dict[str, str]] = []
+
+    if suffix == ".csv":
+        with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                alias_raw = str(row.get("alias_raw", "")).strip()
+                alias_normalized = str(row.get("alias_normalized", "")).strip()
+                canonical_label = str(
+                    row.get("canonical_label")
+                    or row.get("canonical")
+                    or row.get("canonical_norm")
+                    or ""
+                ).strip()
+                include_flag = str(row.get("include_flag", "yes")).strip().lower()
+                if not alias_raw or not canonical_label:
+                    continue
+                rows.append(
+                    {
+                        "alias_raw": alias_raw,
+                        "alias_normalized": alias_normalized or normalize_drug_text(alias_raw),
+                        "canonical_label": canonical_label,
+                        "mapping_type": str(row.get("mapping_type", "")).strip(),
+                        "confidence": str(row.get("confidence", "")).strip().lower(),
+                        "include_flag": include_flag or "yes",
+                        "notes": str(row.get("notes", "")).strip(),
+                        "source_reference": str(row.get("source_reference", "")).strip(),
+                    }
+                )
+        return rows
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        return rows
+
+    for k, v in raw.items():
+        if isinstance(v, dict):
+            rows.append(
+                {
+                    "alias_raw": str(k).strip(),
+                    "alias_normalized": normalize_drug_text(str(k)),
+                    "canonical_label": str(v.get("canonical", "")).strip(),
+                    "mapping_type": str(v.get("type", "")).strip(),
+                    "confidence": str(v.get("confidence", "")).strip().lower(),
+                    "include_flag": "yes",
+                    "notes": str(v.get("notes", "")).strip(),
+                    "source_reference": str(v.get("source_reference", "")).strip(),
+                }
+            )
+        else:
+            rows.append(
+                {
+                    "alias_raw": str(k).strip(),
+                    "alias_normalized": normalize_drug_text(str(k)),
+                    "canonical_label": str(v).strip(),
+                    "mapping_type": "legacy_flat_json",
+                    "confidence": "high",
+                    "include_flag": "yes",
+                    "notes": "",
+                    "source_reference": "legacy_json",
+                }
+            )
+    return rows
+
+
 def load_alias_map(path: Path) -> Dict[str, str]:
     if not path.exists():
         return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
     out = {}
-    if not isinstance(raw, dict):
-        return out
-    for k, v in raw.items():
-        canonical = v.get("canonical") if isinstance(v, dict) else v
-        nk = normalize_drug_text(k)
-        nv = normalize_drug_text(canonical)
+    for row in load_alias_entries(path):
+        if str(row.get("include_flag", "yes")).strip().lower() not in {"yes", "true", "1"}:
+            continue
+        nk = normalize_drug_text(row.get("alias_normalized") or row.get("alias_raw") or "")
+        nv = normalize_drug_text(row.get("canonical_label") or "")
         if nk and nv:
             out[nk] = nv
     return out
@@ -662,6 +725,88 @@ def _link_unresolved_mention(
         "reason_codes": reasons,
         "top_k_candidates": scored,
         "feature_values": best["feature_values"],
+    }
+
+
+def link_mention_to_canonical_vocab(
+    raw_mention: str,
+    alias_map: Dict[str, str],
+    candidate_universe: Optional[CanonicalDrugUniverse] = None,
+    pathb_config: Optional[PathBConfig] = None,
+    mention_metadata: Optional[dict] = None,
+) -> Dict:
+    """
+    Public entry point for Path A + Path B over a canonical drug vocabulary.
+
+    Returns a dictionary containing:
+    - raw_mention
+    - mention_norm
+    - patha_term
+    - patha_exact_vocab_hit
+    - prediction
+    - accepted
+    - score
+    - calibrated_confidence
+    - reason_codes
+    - top_k_candidates
+    """
+    mention_norm = normalize_drug_text(raw_mention)
+    if not mention_norm:
+        return {
+            "raw_mention": str(raw_mention),
+            "mention_norm": "",
+            "patha_term": "",
+            "patha_exact_vocab_hit": False,
+            "prediction": "",
+            "accepted": False,
+            "score": 0.0,
+            "calibrated_confidence": 0.0,
+            "reason_codes": ["empty_after_normalization"],
+            "top_k_candidates": [],
+            "feature_values": {},
+            "stage": "path_a_unresolved",
+        }
+
+    universe = candidate_universe or build_canonical_drug_universe(alias_map=alias_map)
+    cfg = pathb_config or PathBConfig()
+    patha_term = canonicalize_drug(mention_norm, alias_map)
+    exact = universe.synonym_to_canonical.get(patha_term, "")
+    if exact:
+        return {
+            "raw_mention": str(raw_mention),
+            "mention_norm": mention_norm,
+            "patha_term": patha_term,
+            "patha_exact_vocab_hit": True,
+            "prediction": exact,
+            "accepted": True,
+            "score": 1.0,
+            "calibrated_confidence": 1.0,
+            "reason_codes": ["deterministic_exact_match"],
+            "top_k_candidates": [],
+            "feature_values": {},
+            "stage": "path_a_exact_vocab",
+        }
+
+    decision = _link_unresolved_mention(
+        mention_norm=patha_term,
+        universe=universe,
+        cfg=cfg,
+        mention_meta=mention_metadata,
+    )
+    prediction = decision["best_candidate"] if decision["accepted"] else ""
+    return {
+        "raw_mention": str(raw_mention),
+        "mention_norm": mention_norm,
+        "patha_term": patha_term,
+        "patha_exact_vocab_hit": False,
+        "prediction": prediction,
+        "accepted": bool(decision["accepted"]),
+        "score": float(decision["score"]),
+        "calibrated_confidence": float(decision["calibrated_confidence"]),
+        "reason_codes": list(decision["reason_codes"]),
+        "top_k_candidates": decision["top_k_candidates"],
+        "feature_values": decision["feature_values"],
+        "stage": "path_b_canonical_transparent",
     }
 
 

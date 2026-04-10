@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RQ1 Step 4: Compute note-vs-structured similarity metrics by visit.
+Legacy downstream concordance utility: compute note-vs-structured similarity metrics by visit.
 
 Inputs:
 - note visit-level file from Step 2:
@@ -555,8 +555,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--drug-aliases-json",
-        default="resources/manual/pathA_alias_map.json",
-        help="Alias map JSON used by deterministic drug normalization. Supports flat or structured Path A JSON.",
+        default="resources/lexicons/rq1_drug_aliases.csv",
+        help="Alias artifact used by deterministic drug normalization. Supports CSV or JSON.",
     )
     p.add_argument(
         "--output-link-diagnostics-csv",

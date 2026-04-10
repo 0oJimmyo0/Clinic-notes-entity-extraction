@@ -1,8 +1,9 @@
 # RQ1 drug alias map
 
-**File:** `rq1_drug_aliases.json`
+**Primary file:** `rq1_drug_aliases.csv`  
+**Compatibility file:** `rq1_drug_aliases.json`
 
-**Purpose:** Maps brand or shorthand drug names to a canonical (usually generic) name for Path A drug normalization in RQ1 similarity (Step 4). Both note-derived and EHR-derived drug terms are normalized and looked up; matching is by exact equality of canonical form.
+**Purpose:** Curated Path A alias resource for deterministic, high-precision drug normalization. The CSV is the paper-facing artifact because it records mapping type, confidence, include/exclude status, notes, and source reference. The JSON is retained for backward compatibility.
 
 **Origin and reference:**  
 This file was **created for this project** as part of the A+B entity linking rollout (planning alias and freeze scripts). It is a **hand-curated** list of oncology brand/short names to canonical (generic) names, built to support Path A drug normalization in Step 4. Entries were chosen to cover common oncology drugs (hormonals, chemotherapy, immunotherapy, supportive care) likely to appear in notes and structured EHR. There is no automated derivation from an external database.
@@ -11,4 +12,14 @@ This file was **created for this project** as part of the A+B entity linking rol
 
 For verification of brand–generic pairs, standard references include FDA Orange Book, RxNorm (NLM), or Drugs@FDA; for a more comprehensive or reproducible map, consider deriving or supplementing from RxNorm with a consistent citation.
 
-**Format:** JSON object: keys = normalized brand/short name (lowercase), values = canonical generic (or preferred) name.
+**CSV columns:**
+- `alias_raw`
+- `alias_normalized`
+- `canonical_label`
+- `mapping_type`
+- `confidence`
+- `include_flag`
+- `notes`
+- `source_reference`
+
+Only rows with `include_flag=yes` should be used in active Path A.
