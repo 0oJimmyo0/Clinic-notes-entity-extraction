@@ -119,6 +119,27 @@ def discover_lexicons(lexicon_dir: Path) -> Dict:
     return cfg
 
 
+def summarize_lexicons(lex_cfg: Dict) -> Dict[str, int]:
+    ehr = lex_cfg.get("ehr_entities", {})
+    return {
+        "treatment_action_term_count": int(sum(len(v) for v in lex_cfg["candidate_patterns"]["treatment_actions"].values())),
+        "discontinuation_reason_term_count": int(
+            sum(len(v) for v in lex_cfg["candidate_patterns"]["discontinuation_reasons"].values())
+        ),
+        "treatment_context_term_count": int(sum(len(v) for v in lex_cfg["candidate_patterns"]["treatment_context"].values())),
+        "ehr_condition_term_count": int(len(ehr.get("conditions", []))),
+        "ehr_drug_term_count": int(len(ehr.get("drugs", []))),
+        "ehr_measurement_term_count": int(len(ehr.get("measurements", []))),
+        "ehr_procedure_term_count": int(len(ehr.get("procedures", []))),
+        "ehr_entity_terms_total": int(
+            len(ehr.get("conditions", []))
+            + len(ehr.get("drugs", []))
+            + len(ehr.get("measurements", []))
+            + len(ehr.get("procedures", []))
+        ),
+    }
+
+
 ALLOWED_SHORT_ENTITY_TERMS = {
     "ct", "mri", "pet", "psa", "hiv", "bmi", "ecg", "ekg", "a1c",
     "cbc", "cmp", "bun", "ast", "alt", "wbc", "hgb", "hct", "plt",
@@ -352,6 +373,22 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Optional cap for testing (0 means all rows).",
     )
+    parser.add_argument(
+        "--debug-max-examples",
+        type=int,
+        default=0,
+        help="Number of unique span_text examples to include with raw detections in debug report.",
+    )
+    parser.add_argument(
+        "--debug-report-json",
+        default="",
+        help="Optional debug report JSON path. Defaults to <output_csv_stem>_stage2_debug_report.json.",
+    )
+    parser.add_argument(
+        "--allow-zero-entity-coverage",
+        action="store_true",
+        help="If set, do not fail when all entity columns are empty. Not recommended for active runs.",
+    )
     parser.add_argument("--force", action="store_true", help="Ignore resume and re-run from 0.")
     return parser.parse_args()
 
@@ -390,6 +427,10 @@ def main() -> int:
         return 1
 
     lex_cfg = discover_lexicons(lex_dir)
+    lex_summary = summarize_lexicons(lex_cfg)
+    print(f"Lexicon summary: {json.dumps(lex_summary, sort_keys=True)}")
+    if lex_summary["ehr_entity_terms_total"] == 0:
+        print("WARNING: No ehr_entities__*.csv lexicons detected; entity extraction columns are likely to be empty.")
     nlp, reason_keys = setup_nlp(lex_cfg)
 
     state = Stage2State(processed_rows=0, total_rows=total, updated_at="")
@@ -437,6 +478,9 @@ def main() -> int:
 
     t0 = time.time()
     cache: Dict[str, Dict] = {}
+    raw_detection_total = 0
+    raw_detection_by_label: Dict[str, int] = {}
+    debug_examples: List[Dict] = []
     total_batches = (len(unique_texts) + args.batch_size - 1) // args.batch_size
     produced = []
 
@@ -445,7 +489,31 @@ def main() -> int:
         e = min((b + 1) * args.batch_size, len(unique_texts))
         batch_texts = unique_texts[s:e]
         for txt, doc in zip(batch_texts, nlp.pipe(batch_texts, batch_size=args.batch_size)):
-            cache[txt] = extract_with_medspacy(txt, doc=doc, reason_keys=reason_keys)
+            extracted = extract_with_medspacy(txt, doc=doc, reason_keys=reason_keys)
+            cache[txt] = extracted
+
+            raw_ents = []
+            for ent in doc.ents:
+                raw_detection_total += 1
+                raw_detection_by_label[ent.label_] = raw_detection_by_label.get(ent.label_, 0) + 1
+                if len(debug_examples) < args.debug_max_examples:
+                    raw_ents.append(
+                        {
+                            "text": ent.text,
+                            "label": ent.label_,
+                            "is_negated": bool(getattr(ent._, "is_negated", False)),
+                            "is_uncertain": bool(getattr(ent._, "is_uncertain", False)),
+                        }
+                    )
+
+            if len(debug_examples) < args.debug_max_examples:
+                debug_examples.append(
+                    {
+                        "input_span_text": txt,
+                        "raw_medspacy_entities": raw_ents,
+                        "post_filter_extraction": extracted,
+                    }
+                )
 
         if (b + 1) % max(args.save_every_batches, 1) == 0 or b + 1 == total_batches:
             elapsed = time.time() - t0
@@ -459,6 +527,8 @@ def main() -> int:
             )
 
     # Assemble row-level output
+    post_filter_entity_mentions_total = 0
+    post_filter_entity_rows = 0
     for row, txt in zip(rows, span_texts):
         x = cache.get(
             txt,
@@ -472,6 +542,17 @@ def main() -> int:
                 "procedures": [],
             },
         )
+
+        row_entity_total = (
+            len(x.get("conditions", []))
+            + len(x.get("drugs", []))
+            + len(x.get("measurements", []))
+            + len(x.get("procedures", []))
+        )
+        post_filter_entity_mentions_total += row_entity_total
+        if row_entity_total > 0:
+            post_filter_entity_rows += 1
+
         produced.append(
             {
                 "person_id": row.get("person_id"),
@@ -500,6 +581,57 @@ def main() -> int:
     tmp.replace(out_csv)
 
     elapsed = time.time() - t0
+
+    nonempty_entity_counts = {
+        col: int(final_out[col].fillna("[]").astype(str).ne("[]").sum())
+        for col in ["conditions", "drugs", "measurements", "procedures"]
+    }
+    stage2_nonempty_any_entity = int(
+        (
+            final_out["conditions"].fillna("[]").astype(str).ne("[]")
+            | final_out["drugs"].fillna("[]").astype(str).ne("[]")
+            | final_out["measurements"].fillna("[]").astype(str).ne("[]")
+            | final_out["procedures"].fillna("[]").astype(str).ne("[]")
+        ).sum()
+    )
+
+    likely_failure_point = "none"
+    if lex_summary["ehr_entity_terms_total"] == 0:
+        likely_failure_point = "no_ehr_entity_lexicons_loaded"
+    elif raw_detection_total == 0:
+        likely_failure_point = "no_raw_medspacy_detections"
+    elif raw_detection_total > 0 and post_filter_entity_mentions_total == 0:
+        likely_failure_point = "raw_detections_filtered_or_not_mapped_to_entity_labels"
+    elif post_filter_entity_mentions_total > 0 and stage2_nonempty_any_entity == 0:
+        likely_failure_point = "serialization_or_output_contract_issue"
+
+    debug_report = {
+        "input_csv": str(in_csv),
+        "output_csv": str(out_csv),
+        "input_row_count": int(total),
+        "processed_row_count": int(len(final_out)),
+        "unique_span_text_count": int(len(unique_texts)),
+        "lexicon_summary": lex_summary,
+        "raw_detection_total": int(raw_detection_total),
+        "raw_detection_by_label": raw_detection_by_label,
+        "post_filter_entity_mentions_total": int(post_filter_entity_mentions_total),
+        "post_filter_entity_rows": int(post_filter_entity_rows),
+        "nonempty_entity_counts": nonempty_entity_counts,
+        "stage2_nonempty_any_entity": int(stage2_nonempty_any_entity),
+        "output_schema": list(final_out.columns),
+        "sample_input_rows": rows[: min(5, len(rows))],
+        "sample_detection_debug": debug_examples,
+        "likely_failure_point": likely_failure_point,
+    }
+
+    debug_report_path = (
+        Path(args.debug_report_json).resolve()
+        if args.debug_report_json
+        else out_csv.with_name(f"{out_csv.stem}_stage2_debug_report.json")
+    )
+    debug_report_path.parent.mkdir(parents=True, exist_ok=True)
+    debug_report_path.write_text(json.dumps(debug_report, indent=2), encoding="utf-8")
+
     state = Stage2State(
         processed_rows=len(final_out),
         total_rows=total,
@@ -511,8 +643,26 @@ def main() -> int:
     print(f"Stage-2 completed rows: {len(final_out):,}/{total:,}")
     print(f"Saved output: {out_csv}")
     print(f"Saved state:  {state_file}")
+    print(f"Saved debug report: {debug_report_path}")
+    print(
+        "Entity coverage: "
+        f"conditions={nonempty_entity_counts['conditions']:,}, "
+        f"drugs={nonempty_entity_counts['drugs']:,}, "
+        f"measurements={nonempty_entity_counts['measurements']:,}, "
+        f"procedures={nonempty_entity_counts['procedures']:,}, "
+        f"any_entity_rows={stage2_nonempty_any_entity:,}"
+    )
     print(f"Elapsed:      {elapsed/60:.1f} min")
     print("=" * 88)
+
+    if stage2_nonempty_any_entity == 0 and not args.allow_zero_entity_coverage:
+        print(
+            "ERROR: Stage-2 produced zero entity coverage across all rows. "
+            "Failing fast to prevent invalid downstream aggregation/diagnostics."
+        )
+        print(f"Inspect debug report: {debug_report_path}")
+        return 2
+
     return 0
 
 
