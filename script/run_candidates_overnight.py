@@ -429,10 +429,14 @@ def resolve_chunks(chunk_dir: Path, chunk_prefix: str, chunk_names: Optional[Lis
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Overnight chunk candidate extraction runner.")
-    parser.add_argument("--chunk-dir", default="episode_notes", help="Directory containing chunk parquet files.")
+    parser.add_argument(
+        "--chunk-dir",
+        default="../episode_notes/subcohort_clinic_like_20k_30k",
+        help="Directory containing chunk parquet files.",
+    )
     parser.add_argument(
         "--chunk-prefix",
-        default="episode_notes_chunk",
+        default="notes",
         help="Chunk file prefix before numeric id.",
     )
     parser.add_argument(
@@ -442,7 +446,11 @@ def parse_args() -> argparse.Namespace:
         help='Optional explicit chunk names without extension (e.g., "episode_notes_chunk000").',
     )
     parser.add_argument("--lexicon-dir", default="lexicons", help="Lexicon directory.")
-    parser.add_argument("--output-dir", default="episode_extraction_results", help="Output directory.")
+    parser.add_argument(
+        "--output-dir",
+        default="../episode_extraction_results/clinic_like_20k_30k/candidates",
+        help="Output directory.",
+    )
     parser.add_argument(
         "--max-candidates-per-patient",
         type=int,
@@ -458,7 +466,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--combine", action="store_true", help="Write all_candidates_combined.csv at end.")
     parser.add_argument(
         "--state-file",
-        default="episode_extraction_results/candidate_run_state.json",
+        default="../episode_extraction_results/clinic_like_20k_30k/candidate_run_state.json",
         help="Path for run-state JSON file.",
     )
     return parser.parse_args()

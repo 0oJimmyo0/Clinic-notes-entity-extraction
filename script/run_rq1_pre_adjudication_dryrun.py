@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run pre-adjudication dry-run diagnostics for baseline/Path A/Path B.")
     p.add_argument(
         "--note-csv",
-        default="episode_extraction_results/rq1/rq1_note_entities_by_visit.csv",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/rq1_note_entities_by_visit.csv",
         help="Visit-level note entities CSV (must include person_id, visit_id, drugs column).",
     )
     p.add_argument(
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--subset-csv",
-        default="",
+        default="../episode_notes/subcohort_clinic_like_20k_30k/visit_manifest.csv",
         help="Optional subset CSV to filter visits (e.g., adjudication subset manifest).",
     )
     p.add_argument(
@@ -85,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--output-dir",
-        default="episode_extraction_results/rq1/pre_adjudication_dryrun",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/pre_adjudication_dryrun",
         help="Output directory.",
     )
     return p.parse_args()

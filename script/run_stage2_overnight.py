@@ -342,17 +342,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Overnight Stage-2 medspaCy runner.")
     parser.add_argument(
         "--input-csv",
-        default="episode_extraction_results/all_candidates_combined.csv",
+        default="../episode_extraction_results/clinic_like_20k_30k/candidates/all_candidates_combined.csv",
         help="Input candidates CSV.",
     )
     parser.add_argument(
         "--output-csv",
-        default="episode_extraction_results/extracted_treatment_data_episode_cleaned.csv",
+        default="../episode_extraction_results/clinic_like_20k_30k/stage2/extracted_treatment_data_episode_cleaned.csv",
         help="Output extracted CSV.",
     )
     parser.add_argument(
         "--state-file",
-        default="episode_extraction_results/stage2_run_state.json",
+        default="../episode_extraction_results/clinic_like_20k_30k/stage2/stage2_run_state.json",
         help="Progress state file.",
     )
     parser.add_argument(

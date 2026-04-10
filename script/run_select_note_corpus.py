@@ -54,8 +54,8 @@ DEFAULT_CLINIC_NOTE_TYPES = [
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Define visit-level corpora for downstream concordance and adjudication")
-    ap.add_argument("--notes-dir", type=Path, default=Path("episode_notes"))
-    ap.add_argument("--glob", default="episode_notes_chunk*.parquet")
+    ap.add_argument("--notes-dir", type=Path, default=Path("../episode_notes/subcohort_clinic_like_20k_30k"))
+    ap.add_argument("--glob", default="notes.parquet")
     ap.add_argument(
         "--note-text-col-candidates",
         default="note_text_full,full_note_text,note_text,text",
@@ -64,16 +64,16 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument(
         "--candidate-csv",
         type=Path,
-        default=Path("episode_extraction_results/archive_candidates/all_candidates_combined.csv"),
+        default=Path("../episode_extraction_results/clinic_like_20k_30k/candidates/all_candidates_combined.csv"),
         help="Stage-1 candidate span file",
     )
     ap.add_argument(
         "--structured-ehr-csv",
         type=Path,
-        default=Path("episode_extraction_results/rq1/rq1_ehr_entities_by_visit.csv"),
+        default=Path("../episode_extraction_results/clinic_like_20k_30k/rq1/rq1_ehr_entities_by_visit.csv"),
         help="Visit-level structured entities file",
     )
-    ap.add_argument("--output-dir", type=Path, default=Path("episode_notes/manifests"))
+    ap.add_argument("--output-dir", type=Path, default=Path("../episode_notes/manifests_clinic_like_20k_30k"))
     ap.add_argument(
         "--write-cohort-note-parquet",
         action="store_true",

@@ -1,33 +1,48 @@
-# Subcohort notes.parquet: Detailed Statistics and Readiness Assessment
+# Clinic-Like 20-30k Subcohort: Detailed Statistics and Readiness Assessment
 
-Date: 2026-04-09
+Date: 2026-04-10
 
-## Data Source
+## Direct Answer
 
-- File: episode_notes/subcohort_patient_complete/notes.parquet
+Yes. The active cohort has been switched to the clinic-like 20-30k version.
+
+- notes: 22,483
+- clinic-like notes: 22,483 / 22,483 (100.00%)
+- non-clinic-like notes: 0 / 22,483 (0.00%)
+
+## Data Source (Active 20-30k Cohort)
+
+- Primary notes file:
+  - `episode_notes/subcohort_clinic_like_20k_30k/notes.parquet`
 - Related manifests:
-  - episode_notes/subcohort_patient_complete/note_manifest.csv
-  - episode_notes/subcohort_patient_complete/visit_manifest.csv
-  - episode_notes/subcohort_patient_complete/patient_manifest.csv
-  - episode_notes/subcohort_patient_complete/summary.json
+  - `episode_notes/subcohort_clinic_like_20k_30k/note_manifest.csv`
+  - `episode_notes/subcohort_clinic_like_20k_30k/visit_manifest.csv`
+  - `episode_notes/subcohort_clinic_like_20k_30k/patient_manifest.csv`
+  - `episode_notes/subcohort_clinic_like_20k_30k/summary.json`
+
+Current extraction run outputs for this cohort:
+- `episode_extraction_results/clinic_like_20k_30k/candidates/all_candidates_combined.csv`
+- `episode_extraction_results/clinic_like_20k_30k/stage2/extracted_treatment_data_episode_cleaned.csv`
+- `episode_extraction_results/clinic_like_20k_30k/rq1/rq1_note_entities_by_visit.csv`
+- `episode_extraction_results/clinic_like_20k_30k/rq1/pre_adjudication_dryrun/rq1_preadj_dryrun_summary.json`
 
 ## Structural Profile
 
-- Rows: 21,786
+- Rows: 22,483
 - Columns: 12
 - Column set:
-  - TaskIDNumber
-  - person_id
-  - visit_occurrence_id
-  - note_id
-  - note_date
-  - note_datetime
-  - note_title
-  - note_title_norm
-  - note_len
-  - note_text
-  - source_note_text_col
-  - is_clinic_like_note
+  - `TaskIDNumber`
+  - `person_id`
+  - `visit_occurrence_id`
+  - `note_id`
+  - `note_date`
+  - `note_datetime`
+  - `note_title`
+  - `note_title_norm`
+  - `note_len`
+  - `note_text`
+  - `source_note_text_col`
+  - `is_clinic_like_note`
 
 ## Data Quality Checks
 
@@ -35,9 +50,9 @@ Completeness:
 - 0 missing values in all 12 columns.
 
 Uniqueness and duplicate checks:
-- Duplicate note_id rows: 0
-- Duplicate person_id + visit_occurrence_id + note_id rows: 0
-- Duplicate person_id + visit_occurrence_id + note_text rows: 0
+- Duplicate `note_id` rows: 0
+- Duplicate `person_id + visit_occurrence_id + note_id` rows: 0
+- Duplicate `person_id + visit_occurrence_id + note_text` rows: 0
 
 Manifest consistency:
 - notes.parquet rows minus note_manifest rows: 0
@@ -48,130 +63,91 @@ Manifest consistency:
 
 ## Cohort Cardinality
 
-- Unique patients: 479
-- Unique visits: 7,499
-- Unique notes: 21,786
-- Notes per patient (mean): 45.48
-- Notes per patient (p50): 38
-- Notes per patient (p95): 104.3
-- Notes per visit (mean): 2.91
-- Notes per visit (p50): 2
-- Notes per visit (p95): 7
+- Unique patients: 761
+- Unique visits: 11,812
+- Unique notes: 22,483
+
+Notes per patient:
+- mean: 29.54
+- p50: 25
+- p95: 68
+
+Notes per visit:
+- mean: 1.90
+- p50: 1
+- p95: 4
 
 ## Text-Length and Content Coverage
 
-note_len and note_text length are exactly aligned:
+`note_len` and `note_text` length are exactly aligned:
 - mean absolute difference: 0
-- exact matches: 21,786/21,786
+- exact matches: 22,483 / 22,483
 
 Text length distribution:
 - Empty text rows: 0
-- <50 chars: 950
-- <100 chars: 3,223
-- 100-299 chars: 3,445
-- 300-999 chars: 3,571
-- >=1000 chars: 11,547
-- mean: 1,134.43
-- p50: 1,193
+- <50 chars: 816
+- <100 chars: 2,011
+- 100-299 chars: 2,787
+- 300-999 chars: 2,897
+- >=1000 chars: 14,788
+- mean: 1,373.52
+- p50: 2,000
 - p95: 2,000
 
 Important cap signal:
-- note_len max = 2,000
-- rows with note_len == 2,000: 9,063 (41.6%)
+- `note_len` max = 2,000
+- rows with `note_len == 2,000`: 13,067 (58.12%)
 
-Interpretation: there is likely truncation/capping at 2,000 characters for a large fraction of notes.
+Interpretation: the 2,000-character hard-cap signature remains and should be treated as an upstream context-limitation risk.
 
-## Clinic-Like vs Non-Clinic Mix
+## Clinic-Like Composition
 
-- is_clinic_like_note true: 10,171 (46.69%)
-- is_clinic_like_note false: 11,615 (53.31%)
+- `is_clinic_like_note = true`: 22,483 (100.00%)
+- `is_clinic_like_note = false`: 0 (0.00%)
 
-Top clinic-like titles:
-- Progress Notes: 7,604
-- Assessment & Plan Note: 1,390
-- H&P: 355
-- Consults: 312
-- Patient Instructions: 281
-
-Top non-clinic titles:
-- IMAGING: 2,487
-- SOCIAL HISTORY: 2,330
-- PATHOLOGY AND CYTOLOGY: 787
-- PROCEDURES: 511
-- Anesthesia Procedure Notes: 467
+Top note titles:
+- Progress Notes: 16,981
+- Assessment & Plan Note: 3,060
+- H&P: 740
+- Patient Instructions: 625
+- Consults: 542
+- Discharge Instructions: 239
+- H&P (View-Only): 163
+- Research Coordinator Notes: 133
 
 ## Temporal Coverage
 
-- Date range: 2017-11-02 to 2025-05-12
+- Date range: 2017-11-02 to 2023-04-10
 - Missing dates: 0
-- Distinct years: 9
+- Distinct years: 7
 - Largest years by note count:
-  - 2018: 6,545
-  - 2019: 4,701
-  - 2021: 4,654
-  - 2020: 3,602
+  - 2018: 6,647
+  - 2019: 5,142
+  - 2021: 4,319
+  - 2020: 3,932
+  - 2022: 1,557
+  - 2017: 884
 
-## Selection Bias / Enrichment Relative to Full Eligible Visits
+## Extraction Engineering Readiness (Current 20-30k Run)
 
-Comparison against episode_notes/manifests/full_visit_eligible_manifest.csv:
-- Full eligible visits: 95,078
-- Subcohort visits: 7,499 (7.89% of full eligible)
-- Full eligible patients: 2,106
-- Subcohort patients: 479 (22.74% of full eligible)
+Current pre-adjudication pipeline outputs on this cohort:
+- Candidate rows: 21,530
+- Stage-2 rows: 21,530
+- Stage-2 rows with non-empty drugs: 8,001
+- Stage-2 rows with any non-empty entity column: 11,430
+- Visit-level note-entity rows (Step 2): 6,948
+- Visit-level rows with any non-empty entity column: 4,664
+- Pre-adjudication mentions entering normalization dry-run: 11,195
 
-Enrichment indicators (visit level):
-- has_candidate_span:
-  - full: 22.82%
-  - subcohort: 52.02%
-  - delta: +29.20 percentage points
-- has_structured_drug_data:
-  - full: 11.39%
-  - subcohort: 27.46%
-  - delta: +16.07 percentage points
+Status:
+- Stage-1 candidate extraction: completed
+- Stage-2 extraction: completed with non-empty entity output
+- Step-2 note aggregation: completed with non-empty visit-level coverage
+- Pre-adjudication dry run: completed
 
-Interpretation: this is an intentionally enriched analytic cohort, not a population-representative sample.
+## Interpretation for Mentor Handoff and Next Step
 
-## LLM Extraction Reliability Assessment
-
-Can this cohort be used for LLM entity extraction?
-- Yes, for development and engineering validation.
-- Conditions:
-  - Use a compliant environment for protected health text.
-  - Treat outputs as candidate extraction signals, not final truth.
-  - Account for note truncation and non-clinic-note mix.
-
-Reliability strengths:
-- No missing core fields.
-- No duplicate key collisions.
-- Strong manifest alignment.
-- Reasonable longitudinal depth per patient.
-
-Reliability risks:
-- 41.6% of notes are at the 2,000-char cap, so context may be incomplete.
-- Non-clinic note proportion is high (53.31%), adding off-target text for treatment-context extraction.
-- Cohort is enriched and selective relative to full eligible population.
-
-## Academic Publishability Assessment
-
-Can this cohort be used in a published paper?
-- Yes, as a well-documented development/evaluation cohort for treatment-context extraction, if framed correctly.
-- Not sufficient alone for broad generalization claims.
-
-Required framing in paper:
-- Explicitly describe subcohort selection constraints and enrichment.
-- State that this is not a random sample of all eligible visits.
-- Report note truncation/capping behavior and potential effect on recall.
-- Keep adjudicated note-grounded truth as primary evaluation source.
-- Keep structured EHR concordance as downstream/secondary analysis.
-
-Recommended minimum additions before final claims:
-- Sensitivity analysis by note type (clinic-like vs non-clinic).
-- Sensitivity analysis for capped (2,000-char) vs uncapped notes.
-- Coverage table showing candidate-bearing vs non-candidate visits.
-- Clear external-validity limitations section.
-
-## Decision Summary
-
-- Engineering reliability for LLM extraction: acceptable with caveats.
-- Academic suitability: acceptable for publication when positioned as an adjudication-first, enriched cohort with explicit limitations.
-- Do not position this cohort as representative of all clinic notes or all eligible visits.
+- This is the cohort to share for the clinic-like 20-30k plan.
+- It is clinic-like-only by construction and within the intended note budget.
+- Engineering prerequisites for LLM entity extraction and human review handoff are in place.
+- Final adjudicated truth performance is not yet claimed here; these are pre-adjudication readiness statistics.

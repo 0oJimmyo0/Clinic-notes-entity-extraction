@@ -120,12 +120,12 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="RQ1 Step 2 note-entity aggregation.")
     p.add_argument(
         "--input-csv",
-        default="episode_extraction_results/archive_stage2/extracted_treatment_data_episode_cleaned.csv",
+        default="../episode_extraction_results/clinic_like_20k_30k/stage2/extracted_treatment_data_episode_cleaned.csv",
         help="Stage-2 extracted span-level CSV.",
     )
     p.add_argument(
         "--output-csv",
-        default="episode_extraction_results/rq1/rq1_note_entities_by_visit.csv",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/rq1_note_entities_by_visit.csv",
         help="Visit-level aggregated note-entity CSV.",
     )
     p.add_argument(
