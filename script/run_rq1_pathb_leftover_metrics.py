@@ -48,10 +48,20 @@ def main() -> int:
     patha_correct = df["patha_correct"].astype(bool)
     pathb_accepted = df["pathb_accepted"].astype(bool)
     pathb_correct = df["pathb_correct"].astype(bool)
+    pathb_stage = (
+        df["pathb_stage"].astype(str).str.strip().str.lower()
+        if "pathb_stage" in df.columns
+        else pd.Series([""] * len(df), index=df.index)
+    )
 
     leftover_mask = ~patha_correct
     leftover = df[leftover_mask].copy()
     accepted_leftover = leftover[leftover["pathb_accepted"].astype(bool)].copy()
+    # Plumbing note: pathb_accepted includes deterministic path_a_exact_vocab rows.
+    # Keep legacy metrics and also report strict Path B-stage-only metrics.
+    strict_pathb_stage_mask = pathb_stage.eq("path_b_canonical_transparent")
+    strict_leftover = df[leftover_mask & strict_pathb_stage_mask].copy()
+    strict_accepted_leftover = strict_leftover[strict_leftover["pathb_accepted"].astype(bool)].copy()
 
     patha_leftover_n = int(len(leftover))
     pathb_leftover_accepted_n = int(len(accepted_leftover))
@@ -62,6 +72,20 @@ def main() -> int:
     pathb_leftover_recovery_rate = _safe_rate(pathb_leftover_recovered_n, patha_leftover_n)
     pathb_leftover_abstention_rate = _safe_rate(
         int((~leftover["pathb_accepted"].astype(bool)).sum()),
+        patha_leftover_n,
+    )
+
+    strict_pathb_leftover_n = int(len(strict_leftover))
+    strict_pathb_leftover_accepted_n = int(len(strict_accepted_leftover))
+    strict_pathb_leftover_recovered_n = int(strict_accepted_leftover["pathb_correct"].astype(bool).sum())
+    strict_pathb_leftover_accepted_precision = (
+        float(strict_accepted_leftover["pathb_correct"].astype(bool).mean())
+        if strict_pathb_leftover_accepted_n
+        else 0.0
+    )
+    strict_pathb_leftover_recovery_rate = _safe_rate(strict_pathb_leftover_recovered_n, patha_leftover_n)
+    strict_pathb_leftover_abstention_rate = _safe_rate(
+        int((~strict_leftover["pathb_accepted"].astype(bool)).sum()),
         patha_leftover_n,
     )
 
@@ -76,6 +100,12 @@ def main() -> int:
             "pathb_leftover_recovered_n": pathb_leftover_recovered_n,
             "pathb_leftover_recovery_rate": round(pathb_leftover_recovery_rate, 6),
             "pathb_leftover_abstention_rate": round(pathb_leftover_abstention_rate, 6),
+            "strict_pathb_leftover_n": strict_pathb_leftover_n,
+            "strict_pathb_leftover_accepted_n": strict_pathb_leftover_accepted_n,
+            "strict_pathb_leftover_accepted_precision": round(strict_pathb_leftover_accepted_precision, 6),
+            "strict_pathb_leftover_recovered_n": strict_pathb_leftover_recovered_n,
+            "strict_pathb_leftover_recovery_rate": round(strict_pathb_leftover_recovery_rate, 6),
+            "strict_pathb_leftover_abstention_rate": round(strict_pathb_leftover_abstention_rate, 6),
         },
     }
 
