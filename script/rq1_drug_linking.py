@@ -141,15 +141,89 @@ def load_alias_entries(path: Path) -> List[Dict[str, str]]:
     return rows
 
 
-def load_alias_map(path: Path) -> Dict[str, str]:
+def load_alias_exclusions(path: Optional[Path]) -> Set[str]:
+    """
+    Load deterministic Path A exclusion terms (ambiguous abbreviations, regimen shorthands).
+    Accepts CSV with one of: term, alias, alias_raw, alias_normalized.
+    """
+    out: Set[str] = set()
+    if path is None or not path.exists():
+        return out
+    if path.suffix.lower() != ".csv":
+        return out
+
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
+        reader = csv.DictReader(f)
+        cols = {str(c).strip().lower(): c for c in (reader.fieldnames or [])}
+        col = cols.get("term") or cols.get("alias") or cols.get("alias_raw") or cols.get("alias_normalized")
+        if col is None:
+            return out
+        for row in reader:
+            n = normalize_drug_text(str(row.get(col, "") or ""))
+            if n:
+                out.add(n)
+    return out
+
+
+def find_alias_conflicts(
+    alias_entries: Sequence[Dict[str, str]],
+    exclusions: Optional[Set[str]] = None,
+) -> List[Dict[str, str]]:
+    """
+    Detect aliases mapping to more than one canonical label among active include_flag rows.
+    """
+    exclusions = exclusions or set()
+    bucket: Dict[str, Set[str]] = defaultdict(set)
+
+    for row in alias_entries:
+        include_flag = str(row.get("include_flag", "yes")).strip().lower()
+        if include_flag not in {"yes", "true", "1"}:
+            continue
+        alias_norm = normalize_drug_text(row.get("alias_normalized") or row.get("alias_raw") or "")
+        canonical_norm = normalize_drug_text(row.get("canonical_label") or "")
+        if not alias_norm or not canonical_norm:
+            continue
+        if alias_norm in exclusions:
+            continue
+        bucket[alias_norm].add(canonical_norm)
+
+    conflicts: List[Dict[str, str]] = []
+    for alias_norm, canonical_set in sorted(bucket.items()):
+        if len(canonical_set) <= 1:
+            continue
+        conflicts.append(
+            {
+                "alias_norm": alias_norm,
+                "canonical_norms": "|".join(sorted(canonical_set)),
+            }
+        )
+    return conflicts
+
+
+def load_alias_map(
+    path: Path,
+    exclusions: Optional[Set[str]] = None,
+    enforce_one_to_one: bool = False,
+) -> Dict[str, str]:
     if not path.exists():
         return {}
+    exclusions = exclusions or set()
+    entries = load_alias_entries(path)
+    conflicts = find_alias_conflicts(entries, exclusions=exclusions)
+    if conflicts and enforce_one_to_one:
+        raise ValueError(
+            "Alias artifact has non one-to-one mappings: "
+            + "; ".join(f"{x['alias_norm']}->{x['canonical_norms']}" for x in conflicts)
+        )
+
     out = {}
-    for row in load_alias_entries(path):
+    for row in entries:
         if str(row.get("include_flag", "yes")).strip().lower() not in {"yes", "true", "1"}:
             continue
         nk = normalize_drug_text(row.get("alias_normalized") or row.get("alias_raw") or "")
         nv = normalize_drug_text(row.get("canonical_label") or "")
+        if nk in exclusions:
+            continue
         if nk and nv:
             out[nk] = nv
     return out

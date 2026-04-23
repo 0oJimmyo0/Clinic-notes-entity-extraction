@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Dict, List
 
@@ -16,7 +17,10 @@ from rq1_adjudication_utils import write_run_summary
 from rq1_drug_linking import (
     PathBConfig,
     build_canonical_drug_universe,
+    find_alias_conflicts,
     link_mention_to_canonical_vocab,
+    load_alias_entries,
+    load_alias_exclusions,
     load_alias_map,
     normalize_drug_text,
 )
@@ -38,6 +42,16 @@ def parse_args() -> argparse.Namespace:
         "--canonical-vocab-path",
         default="lexicons/rq1_drug_canonical_vocab.csv",
         help="Canonical vocabulary for Path B candidate universe.",
+    )
+    p.add_argument(
+        "--patha-exclusions-csv",
+        default="manual/pathA_alias_exclusions.csv",
+        help="Path A exclusion list (ambiguous abbreviations/regimen shorthand).",
+    )
+    p.add_argument(
+        "--allow-alias-conflicts",
+        action="store_true",
+        help="Allow alias rows where one alias maps to multiple canonical labels (not recommended).",
     )
     p.add_argument("--pathb-top-k", type=int, default=20)
     p.add_argument("--pathb-min-score", type=float, default=0.45)
@@ -85,12 +99,46 @@ def _error_bucket(row: Dict[str, object]) -> str:
     return "tokenization_or_cleanup_miss"
 
 
+def _safe_patha_decompose(patha_term: str, synonym_to_canonical: Dict[str, str]) -> str:
+    """
+    Conservative deterministic decomposition for obvious single-drug combos.
+    Only applies when decomposition yields exactly one unambiguous canonical label.
+    """
+    t = normalize_drug_text(patha_term)
+    if not t:
+        return ""
+    if not any(sep in t for sep in ["/", " + ", " plus ", " and ", " with "]):
+        return t
+
+    raw_parts = [x.strip() for x in re.split(r"\s*(?:/|\+|plus|and|with)\s*", t) if x.strip()]
+    if len(raw_parts) < 2:
+        return t
+
+    mapped = []
+    unresolved = []
+    for p in raw_parts:
+        pn = normalize_drug_text(p)
+        if not pn:
+            continue
+        c = synonym_to_canonical.get(pn)
+        if c:
+            mapped.append(c)
+        else:
+            unresolved.append(pn)
+
+    unique_mapped = sorted(set(mapped))
+    if len(unique_mapped) == 1 and len(unresolved) == 0:
+        return unique_mapped[0]
+    return t
+
+
 def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
     adjud_path = (root / args.adjudicated_mentions_csv).resolve()
     alias_path = (root / args.alias_artifact).resolve()
     vocab_path = (root / args.canonical_vocab_path).resolve() if args.canonical_vocab_path else None
+    exclusions_path = (root / args.patha_exclusions_csv).resolve() if args.patha_exclusions_csv else None
     calibration_path = (root / args.pathb_calibration_json).resolve() if args.pathb_calibration_json else None
     out_dir = (root / args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -105,7 +153,22 @@ def main() -> int:
         raise ValueError(f"Adjudicated mentions missing columns: {sorted(missing)}")
     df = df[df["adjudicated_canonical_label"].astype(str).str.strip() != ""].copy()
 
-    alias_map = load_alias_map(alias_path) if alias_path.exists() else {}
+    patha_exclusions = load_alias_exclusions(exclusions_path) if exclusions_path and exclusions_path.exists() else set()
+    alias_entries = load_alias_entries(alias_path) if alias_path.exists() else []
+    alias_conflicts = find_alias_conflicts(alias_entries, exclusions=patha_exclusions)
+    if alias_conflicts and not args.allow_alias_conflicts:
+        sample = ", ".join(f"{x['alias_norm']}->{x['canonical_norms']}" for x in alias_conflicts[:10])
+        raise ValueError(
+            "Path A alias artifact has non one-to-one mappings after exclusions. "
+            "Fix alias conflicts or rerun with --allow-alias-conflicts. "
+            f"Examples: {sample}"
+        )
+
+    alias_map = (
+        load_alias_map(alias_path, exclusions=patha_exclusions, enforce_one_to_one=not args.allow_alias_conflicts)
+        if alias_path.exists()
+        else {}
+    )
     calibration = None
     if calibration_path and calibration_path.exists():
         calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
@@ -128,8 +191,16 @@ def main() -> int:
     for row in df.itertuples(index=False):
         raw = str(getattr(row, "raw_mention_text", "") or "")
         gold = normalize_drug_text(getattr(row, "adjudicated_canonical_label", "") or "")
-        baseline_pred = normalize_drug_text(raw)
-        patha_pred = normalize_drug_text(alias_map.get(baseline_pred, baseline_pred))
+        a1_norm = normalize_drug_text(raw)
+        baseline_pred = universe.synonym_to_canonical.get(a1_norm, "")
+
+        # Path A components: A1 lexical cleanup, A2 exact canonical match, A3 curated alias,
+        # A4 conservative decomposition only when exactly unambiguous.
+        a2_exact = universe.synonym_to_canonical.get(a1_norm, "")
+        a3_alias = normalize_drug_text(alias_map.get(a1_norm, a1_norm))
+        a4_decomp = _safe_patha_decompose(a3_alias, universe.synonym_to_canonical)
+        patha_pred = universe.synonym_to_canonical.get(a4_decomp, a4_decomp)
+
         pathb_decision = link_mention_to_canonical_vocab(
             raw_mention=raw,
             alias_map=alias_map,
@@ -148,6 +219,10 @@ def main() -> int:
             "gold_canonical": gold,
             "mention_status": getattr(row, "mention_status", ""),
             "compare_to_structured_ehr": getattr(row, "compare_to_structured_ehr", ""),
+            "patha_a1_norm": a1_norm,
+            "patha_a2_exact_vocab": a2_exact,
+            "patha_a3_alias": a3_alias,
+            "patha_a4_decomposed": a4_decomp,
             "baseline_prediction": baseline_pred,
             "baseline_correct": baseline_pred == gold,
             "patha_prediction": patha_pred,
@@ -239,8 +314,15 @@ def main() -> int:
             "inputs": {
                 "adjudicated_mentions_csv": str(adjud_path),
                 "alias_artifact": str(alias_path),
+                "patha_exclusions_csv": str(exclusions_path) if exclusions_path and exclusions_path.exists() else None,
                 "canonical_vocab_path": str(vocab_path) if vocab_path and vocab_path.exists() else None,
                 "pathb_calibration_json": str(calibration_path) if calibration_path and calibration_path.exists() else None,
+            },
+            "patha_alias_quality": {
+                "active_alias_count": int(len(alias_map)),
+                "exclusion_count": int(len(patha_exclusions)),
+                "alias_conflict_rows": int(len(alias_conflicts)),
+                "alias_conflicts_sample": alias_conflicts[:20],
             },
             "metrics": summary,
             "outputs": {
