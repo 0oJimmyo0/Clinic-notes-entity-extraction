@@ -320,8 +320,12 @@ class PathBConfig:
     abbreviation_map: Dict[str, str] = field(default_factory=dict)
     out_of_scope_statuses: Set[str] = field(
         default_factory=lambda: {
+            # Vocabulary-alignment bug fix:
+            # include adjudication contract labels, while keeping legacy aliases for compatibility.
             "unclear",
             "reference_only",
+            "reference_only_or_discussion_only",
+            "planned_or_considering",
             "historical_prior",
             "planned_considering",
             "discussion_only",
