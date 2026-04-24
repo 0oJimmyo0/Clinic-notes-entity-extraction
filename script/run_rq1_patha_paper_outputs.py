@@ -98,6 +98,22 @@ UNCLEAR_TARGET_PATTERNS = [
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate Path A focused paper outputs.")
     p.add_argument(
+        "--cohort-summary-json",
+        default="episode_notes/manifests/cohort_justification_summary.json",
+    )
+    p.add_argument(
+        "--note-truth-summary-json",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/note_truth_eval/rq1_step4_note_truth_summary.json",
+    )
+    p.add_argument(
+        "--packets-notes-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/adjudication_packets/adjudication_packets_notes.csv",
+    )
+    p.add_argument(
+        "--packets-mentions-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/adjudication_packets/adjudication_packets_mentions.csv",
+    )
+    p.add_argument(
         "--normalization-detailed-csv",
         default="episode_extraction_results/clinic_like_20k_30k/rq1/normalization_eval/rq1_normalization_eval_detailed.csv",
     )
@@ -152,6 +168,15 @@ def _to_markdown_table(df: pd.DataFrame) -> str:
 def _write_table(df: pd.DataFrame, out_dir: Path, stem: str) -> None:
     df.to_csv(out_dir / f"{stem}.csv", index=False)
     (out_dir / f"{stem}.md").write_text(_to_markdown_table(df), encoding="utf-8")
+
+
+def _load_json(path: Path) -> Dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 def _svg_text(x: float, y: float, text: str, size: int = 12, weight: str = "normal") -> str:
@@ -356,31 +381,142 @@ def _make_failure_taxonomy(detail: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataF
     return table, examples
 
 
-def _make_note_density_table(adjud: pd.DataFrame, note_manifest: pd.DataFrame) -> pd.DataFrame:
+def _density_bin(n: int) -> str:
+    if n <= 0:
+        return "0"
+    if n == 1:
+        return "1"
+    if n == 2:
+        return "2"
+    if n == 3:
+        return "3"
+    if n == 4:
+        return "4"
+    return ">=5"
+
+
+def _make_note_density_tables(
+    adjud: pd.DataFrame,
+    note_manifest: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     adjud_valid = adjud[adjud["adjudicated_canonical_label"].astype(str).str.strip() != ""].copy()
-    note_counts = adjud_valid.groupby("note_id").size()
-    notes_with_1 = int((note_counts == 1).sum())
-    notes_with_2p = int((note_counts >= 2).sum())
+    adjud_valid["note_id"] = adjud_valid["note_id"].astype(str).str.strip()
+    mention_counts = (
+        adjud_valid.groupby("note_id")
+        .size()
+        .rename("mention_count")
+        .astype(int)
+    )
+    unique_counts = (
+        adjud_valid.groupby("note_id")["adjudicated_canonical_label"]
+        .nunique()
+        .rename("unique_canonical_count")
+        .astype(int)
+    )
+    n_ge1_mentions = int(len(mention_counts))
+    n_all_notes = (
+        int(note_manifest["note_id"].astype(str).str.strip().nunique())
+        if (not note_manifest.empty and "note_id" in note_manifest.columns)
+        else n_ge1_mentions
+    )
+    n_zero = max(n_all_notes - n_ge1_mentions, 0)
 
-    manifest_notes = int(note_manifest["note_id"].astype(str).nunique()) if not note_manifest.empty else int(adjud_valid["note_id"].astype(str).nunique())
-    notes_with_any = int(note_counts.shape[0])
-    notes_with_0 = max(manifest_notes - notes_with_any, 0)
-
-    rows = [
-        ("0 meds", notes_with_0),
-        ("1 med", notes_with_1),
-        (">=2 meds", notes_with_2p),
-    ]
-    out = []
-    for band, c in rows:
-        out.append(
+    # Compact table preserved for paper readability.
+    compact_rows = []
+    for label, mask in [
+        ("0 meds", None),
+        ("1 med", mention_counts == 1),
+        (">=2 meds", mention_counts >= 2),
+    ]:
+        c = n_zero if label == "0 meds" else int(mask.sum())
+        compact_rows.append(
             {
-                "note_medication_density": band,
-                "note_count": int(c),
-                "percent_of_notes": round(100.0 * _safe_div(c, manifest_notes), 2),
+                "note_medication_density": label,
+                "note_count": c,
+                "percent_of_all_manifest_notes": round(100.0 * _safe_div(c, n_all_notes), 2),
+                "denominator_all_manifest_notes_n": n_all_notes,
             }
         )
-    return pd.DataFrame(out)
+    compact_df = pd.DataFrame(compact_rows)
+
+    # Detailed table: explicit denominators + both mention-count and unique-canonical-count views.
+    bins = ["0", "1", "2", "3", "4", ">=5"]
+    detailed_rows: List[Dict[str, object]] = []
+    for metric_col, metric_label in [
+        ("mention_count", "adjudicated_mention_count_per_note"),
+        ("unique_canonical_count", "unique_canonical_medication_count_per_note"),
+    ]:
+        vals = mention_counts if metric_col == "mention_count" else unique_counts
+        n_ge1 = int(len(vals))
+        for b in bins:
+            if b == ">=5":
+                mask = vals >= 5
+            else:
+                mask = vals == int(b)
+            c = n_zero if b == "0" else int(mask.sum())
+            detailed_rows.append(
+                {
+                    "density_metric": metric_label,
+                    "density_bin": b,
+                    "note_count": c,
+                    "percent_of_all_manifest_notes": round(100.0 * _safe_div(c, n_all_notes), 2),
+                    "percent_of_notes_with_ge1_for_metric": (
+                        round(100.0 * _safe_div(c, n_ge1), 2) if b != "0" and n_ge1 > 0 else ""
+                    ),
+                    "denominator_all_manifest_notes_n": n_all_notes,
+                    "denominator_notes_with_ge1_for_metric_n": n_ge1,
+                }
+            )
+    detailed_df = pd.DataFrame(detailed_rows)
+
+    # Companion conditioned table requested by user: mention-density among medication-positive notes only.
+    cond = mention_counts.copy()
+    conditioned_rows: List[Dict[str, object]] = []
+    cumulative = 0.0
+    for b in ["1", "2", "3", "4", ">=5"]:
+        if b == ">=5":
+            c = int((cond >= 5).sum())
+        else:
+            c = int((cond == int(b)).sum())
+        pct = 100.0 * _safe_div(c, len(cond))
+        cumulative += pct
+        conditioned_rows.append(
+            {
+                "mention_density_bin_conditioned_on_ge1": b,
+                "note_count": c,
+                "percent_of_notes_with_ge1_mentions": round(pct, 2),
+                "cumulative_percent": round(cumulative, 2),
+                "denominator_notes_with_ge1_mentions_n": int(len(cond)),
+            }
+        )
+    conditioned_df = pd.DataFrame(conditioned_rows)
+
+    stats_df = pd.DataFrame(
+        [
+            ("all_manifest_notes_n", n_all_notes),
+            ("notes_with_ge1_mentions_n", n_ge1_mentions),
+            ("percent_notes_with_ge1_mentions", round(100.0 * _safe_div(n_ge1_mentions, n_all_notes), 2)),
+            (
+                "mean_mentions_per_note_conditioned_ge1",
+                round(float(cond.mean()) if len(cond) else 0.0, 4),
+            ),
+            (
+                "median_mentions_per_note_conditioned_ge1",
+                round(float(cond.median()) if len(cond) else 0.0, 4),
+            ),
+            (
+                "mean_unique_canonical_per_note_conditioned_ge1",
+                round(float(unique_counts.mean()) if len(unique_counts) else 0.0, 4),
+            ),
+            (
+                "median_unique_canonical_per_note_conditioned_ge1",
+                round(float(unique_counts.median()) if len(unique_counts) else 0.0, 4),
+            ),
+        ],
+        columns=["metric", "value"],
+    )
+
+    return compact_df, detailed_df, conditioned_df, stats_df
 
 
 def _make_visit_sensitivity_table(detail: pd.DataFrame) -> pd.DataFrame:
@@ -421,10 +557,58 @@ def _make_visit_sensitivity_table(detail: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["metric", "value"])
 
 
+def _make_compact_cohort_adjudication_results_table(
+    cohort_summary: Dict,
+    packet_notes_n: int,
+    packet_mentions_n: int,
+    normalization_mentions_n: int,
+    note_density_compact: pd.DataFrame,
+) -> pd.DataFrame:
+    density_map = {
+        str(r["note_medication_density"]): int(r["note_count"])
+        for _, r in note_density_compact.iterrows()
+    }
+    all_notes_n = int(note_density_compact["denominator_all_manifest_notes_n"].iloc[0]) if len(note_density_compact) else 0
+
+    rows = [
+        ("Full eligible visits", int(cohort_summary.get("full_eligible_visits", 0)), "visit"),
+        ("Evaluation visits", int(cohort_summary.get("evaluation_visits", 0)), "visit"),
+        ("Adjudication visits", int(cohort_summary.get("adjudication_visits", 0)), "visit"),
+        ("Packet notes", int(packet_notes_n), "note"),
+        ("Packet mentions", int(packet_mentions_n), "mention"),
+        ("Total adjudicated mention rows used in normalization", int(normalization_mentions_n), "mention"),
+        ("Notes with 0 adjudicated meds", int(density_map.get("0 meds", 0)), f"note (denominator={all_notes_n})"),
+        ("Notes with 1 adjudicated med", int(density_map.get("1 med", 0)), f"note (denominator={all_notes_n})"),
+        ("Notes with >=2 adjudicated meds", int(density_map.get(">=2 meds", 0)), f"note (denominator={all_notes_n})"),
+    ]
+    return pd.DataFrame(rows, columns=["item", "value", "unit_or_denominator"])
+
+
+def _make_extraction_performance_table(note_truth_summary: Dict) -> pd.DataFrame:
+    mention = ((note_truth_summary or {}).get("metrics") or {}).get("mention_level", {})
+    return pd.DataFrame(
+        [
+            {
+                "evaluation_unit": "mention-level",
+                "tp": int(mention.get("tp", 0)),
+                "fp": int(mention.get("fp", 0)),
+                "fn": int(mention.get("fn", 0)),
+                "precision": round(float(mention.get("precision", 0.0)), 6),
+                "recall": round(float(mention.get("recall", 0.0)), 6),
+                "f1": round(float(mention.get("f1", 0.0)), 6),
+            }
+        ]
+    )
+
+
 def main() -> int:
     args = parse_args()
     # Script lives in resources/script; project root is two levels up.
     root = Path(__file__).resolve().parents[2]
+    cohort_summary_path = (root / args.cohort_summary_json).resolve()
+    note_truth_summary_path = (root / args.note_truth_summary_json).resolve()
+    packets_notes_path = (root / args.packets_notes_csv).resolve()
+    packets_mentions_path = (root / args.packets_mentions_csv).resolve()
     detail_path = (root / args.normalization_detailed_csv).resolve()
     adjud_path = (root / args.adjudicated_mentions_csv).resolve()
     note_manifest_path = (root / args.note_manifest_csv).resolve()
@@ -441,6 +625,10 @@ def main() -> int:
     detail = pd.read_csv(detail_path).fillna("")
     adjud = pd.read_csv(adjud_path).fillna("")
     note_manifest = pd.read_csv(note_manifest_path).fillna("") if note_manifest_path.exists() else pd.DataFrame()
+    cohort_summary = _load_json(cohort_summary_path)
+    note_truth_summary = _load_json(note_truth_summary_path)
+    packets_notes_n = int(len(pd.read_csv(packets_notes_path))) if packets_notes_path.exists() else 0
+    packets_mentions_n = int(len(pd.read_csv(packets_mentions_path))) if packets_mentions_path.exists() else 0
 
     patha_exclusions = load_alias_exclusions(exclusions_path) if exclusions_path.exists() else set()
     alias_map = load_alias_map(alias_path, exclusions=patha_exclusions, enforce_one_to_one=False) if alias_path.exists() else {}
@@ -456,12 +644,32 @@ def main() -> int:
         _write_table(taxonomy_examples_df, out_dir, "rq1_table_patha_failure_taxonomy_examples")
 
     # 3) Note medication density table.
-    note_density_df = _make_note_density_table(adjud=adjud, note_manifest=note_manifest)
+    note_density_df, note_density_detailed_df, note_density_conditioned_df, note_density_stats_df = _make_note_density_tables(
+        adjud=adjud,
+        note_manifest=note_manifest,
+    )
     _write_table(note_density_df, out_dir, "rq1_table_note_med_density")
+    _write_table(note_density_detailed_df, out_dir, "rq1_table_note_med_density_detailed")
+    _write_table(note_density_conditioned_df, out_dir, "rq1_table_note_med_density_conditioned_ge1")
+    _write_table(note_density_stats_df, out_dir, "rq1_table_note_med_density_stats")
 
     # 4) Optional visit-level sensitivity.
     visit_df = _make_visit_sensitivity_table(detail=detail)
     _write_table(visit_df, out_dir, "rq1_table_visit_level_sensitivity")
+
+    # 4b) Compact cohort/adjudication/results grounding table.
+    compact_grounding_df = _make_compact_cohort_adjudication_results_table(
+        cohort_summary=cohort_summary,
+        packet_notes_n=packets_notes_n,
+        packet_mentions_n=packets_mentions_n,
+        normalization_mentions_n=int(len(detail)),
+        note_density_compact=note_density_df,
+    )
+    _write_table(compact_grounding_df, out_dir, "rq1_table_cohort_adjudication_results_compact")
+
+    # 4c) Mention-level extraction performance table (compact).
+    extraction_perf_df = _make_extraction_performance_table(note_truth_summary=note_truth_summary)
+    _write_table(extraction_perf_df, out_dir, "rq1_table_extraction_performance_mention_level")
 
     # 5) Compact visuals (dependency-free SVG).
     _write_workflow_svg(out_dir / "rq1_fig_workflow_patha_focus.svg")
@@ -483,9 +691,17 @@ def main() -> int:
     )
     _write_bar_svg(
         labels=list(note_density_df["note_medication_density"]),
-        values=[float(x) for x in note_density_df["percent_of_notes"]],
+        values=[float(x) for x in note_density_df["percent_of_all_manifest_notes"]],
         title="Adjudicated Medication Mention Density Per Note",
         out_path=out_dir / "rq1_fig_note_med_density.svg",
+        value_fmt="{:.2f}%",
+        max_value=100.0,
+    )
+    _write_bar_svg(
+        labels=list(note_density_conditioned_df["mention_density_bin_conditioned_on_ge1"]),
+        values=[float(x) for x in note_density_conditioned_df["percent_of_notes_with_ge1_mentions"]],
+        title="Medication Mention Density Conditioned on >=1 Mention",
+        out_path=out_dir / "rq1_fig_note_med_density_conditioned_ge1.svg",
         value_fmt="{:.2f}%",
         max_value=100.0,
     )
@@ -499,14 +715,18 @@ def main() -> int:
         "2. `+ lexical cleanup`: `normalize_drug_text(raw_mention_text)` compared directly to gold.\n"
         "3. `+ curated alias map`: `canonicalize_drug(raw_mention_text, alias_map)` (lexical cleanup + curated aliases, exclusions applied) compared directly to gold.\n"
         "4. `+ safe decomposition / full Path A`: frozen rerun `patha_prediction` compared to gold.\n\n"
+        "Ablation interpretation (explicit):\n"
+        "- In this cohort, lexical cleanup and curated aliases account for the measurable gain.\n"
+        "- Safe deterministic decomposition does not add measurable gain beyond alias mapping (delta ~0.000).\n\n"
         "Failure taxonomy procedure:\n"
         "- Applied deterministic rule-based categorization only to remaining Path A failures (`patha_correct == False`).\n"
         "- Category priority order: lab/substance/non-medication -> vague class term -> combination/formulation mismatch -> ambiguous abbreviation -> unclear canonical target -> missing alias.\n"
         "- Rules are encoded in `run_rq1_patha_paper_outputs.py` and therefore reproducible.\n\n"
-        "Note medication-density table:\n"
-        "- Denominator notes from adjudication note manifest.\n"
-        "- Numerator counts from adjudicated mentions with non-empty canonical labels grouped by note.\n"
-        "- Bands: `0 meds`, `1 med`, `>=2 meds`.\n"
+        "Note medication-density tables:\n"
+        "- Primary compact table uses all adjudication-manifest notes as denominator (`percent_of_all_manifest_notes`).\n"
+        "- Companion conditioned table uses only notes with >=1 adjudicated medication mention (`percent_of_notes_with_ge1_mentions`).\n"
+        "- Detailed table reports both mention-count density and unique-canonical-count density bins (`0,1,2,3,4,>=5`) with explicit denominators.\n"
+        "- Numerators come from adjudicated mentions with non-empty canonical labels grouped by note.\n"
     )
     (out_dir / "rq1_methods_note_patha_focus.md").write_text(methods_note, encoding="utf-8")
 
@@ -518,6 +738,19 @@ def main() -> int:
         f"{r['failure_category']} ({int(r['count'])}, {float(r['percent_of_patha_failures']):.2f}%)"
         for _, r in fail_top.iterrows()
     )
+    ge1_n = int(note_density_stats_df.loc[note_density_stats_df["metric"] == "notes_with_ge1_mentions_n", "value"].iloc[0])
+    ge1_pct = float(
+        note_density_stats_df.loc[
+            note_density_stats_df["metric"] == "percent_notes_with_ge1_mentions",
+            "value",
+        ].iloc[0]
+    )
+    ge2_cond = float(
+        note_density_conditioned_df.loc[
+            note_density_conditioned_df["mention_density_bin_conditioned_on_ge1"].isin(["2", "3", "4", ">=5"]),
+            "percent_of_notes_with_ge1_mentions",
+        ].sum()
+    )
     results_paragraph = (
         "In mention-level controlled normalization, surface-exact matching reached "
         f"{100.0*float(s0):.2f}% accuracy, while full deterministic Path A reached {100.0*float(s3):.2f}% "
@@ -525,7 +758,10 @@ def main() -> int:
         "This supports the main claim that adjudication-grounded deterministic normalization materially outperforms surface matching. "
         "Among remaining Path A failures, the dominant categories were "
         f"{fail_desc}, indicating that unresolved errors are concentrated in alias coverage and clinically ambiguous mention forms "
-        "rather than broad extraction collapse."
+        "rather than broad extraction collapse. "
+        "Lexical cleanup and curated aliases explain the observed Path A gain, while safe deterministic decomposition does not add measurable lift in this cohort. "
+        f"At note level, {ge1_n} notes ({ge1_pct:.2f}% of manifest notes) had >=1 adjudicated medication mention; "
+        f"within those medication-positive notes, {ge2_cond:.2f}% contained >=2 adjudicated mentions."
     )
     (out_dir / "rq1_results_paragraph_patha_focus.md").write_text(results_paragraph + "\n", encoding="utf-8")
 
@@ -533,6 +769,10 @@ def main() -> int:
         out_dir / "rq1_patha_paper_outputs_summary.json",
         {
             "inputs": {
+                "cohort_summary_json": str(cohort_summary_path) if cohort_summary_path.exists() else None,
+                "note_truth_summary_json": str(note_truth_summary_path) if note_truth_summary_path.exists() else None,
+                "packets_notes_csv": str(packets_notes_path) if packets_notes_path.exists() else None,
+                "packets_mentions_csv": str(packets_mentions_path) if packets_mentions_path.exists() else None,
                 "normalization_detailed_csv": str(detail_path),
                 "adjudicated_mentions_csv": str(adjud_path),
                 "note_manifest_csv": str(note_manifest_path) if note_manifest_path.exists() else None,
@@ -550,8 +790,13 @@ def main() -> int:
             "outputs_dir": str(out_dir),
             "tables": [
                 "rq1_table_normalization_ladder_patha_focus",
+                "rq1_table_cohort_adjudication_results_compact",
+                "rq1_table_extraction_performance_mention_level",
                 "rq1_table_patha_failure_taxonomy",
                 "rq1_table_note_med_density",
+                "rq1_table_note_med_density_detailed",
+                "rq1_table_note_med_density_conditioned_ge1",
+                "rq1_table_note_med_density_stats",
                 "rq1_table_visit_level_sensitivity",
             ],
             "figures_svg": [
@@ -559,6 +804,7 @@ def main() -> int:
                 "rq1_fig_normalization_ladder_patha_focus.svg",
                 "rq1_fig_patha_failure_taxonomy.svg",
                 "rq1_fig_note_med_density.svg",
+                "rq1_fig_note_med_density_conditioned_ge1.svg",
             ],
             "notes": [
                 "rq1_methods_note_patha_focus.md",

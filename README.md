@@ -42,6 +42,8 @@ Out of scope for the main paper:
      - + safe decomposition / full Path A
 
 5. Results
+   - Compact cohort/adjudication/results grounding table (dataset scale + evaluation units).
+   - Mention-level extraction performance table (TP/FP/FN, precision/recall/F1).
    - Mention-level normalization ladder (primary table).
    - Remaining Path A failure taxonomy.
    - Note medication-density table.
@@ -96,11 +98,28 @@ Primary workflow (end-to-end):
     - `patha_prediction`
 - `script/run_rq1_patha_paper_outputs.py`
   - Builds the paper tables/figures for the Path A-focused framing.
-  - Exports normalization ladder, Path A failure taxonomy, note density, and compact visuals.
+  - Exports cohort/adjudication/results grounding table, extraction performance table, normalization ladder, Path A failure taxonomy, note density tables, and compact visuals.
 
 ## Frozen Key Results to Include (Current Rerun)
 Source cohort/run:
 - `episode_extraction_results/clinic_like_20k_30k/rq1`
+
+Compact cohort/adjudication/results grounding counts:
+- full eligible visits: `95,078`
+- evaluation visits: `10,828`
+- adjudication visits: `5,000`
+- packet notes: `10,543`
+- packet mentions: `31,282`
+- total adjudicated mention rows used in normalization: `27,552`
+- notes with 0 / 1 / >=2 adjudicated meds: `21,378 / 2,159 / 5,168`
+
+Mention-level extraction performance (note-grounded adjudication reference):
+- TP: `19,044`
+- FP: `13,096`
+- FN: `8,508`
+- precision: `0.592533`
+- recall: `0.691202`
+- F1: `0.638075`
 
 Mention-level normalization ladder (`n_mentions = 27,552`):
 - surface-exact baseline: `0.809016`
@@ -108,6 +127,7 @@ Mention-level normalization ladder (`n_mentions = 27,552`):
 - + curated alias map: `0.936484` (`+0.065150` vs previous)
 - + safe decomposition / full Path A: `0.936484` (`+0.000000` vs previous)
 - full Path A delta vs surface-exact: `+0.127468` (12.75 points)
+- explicit ablation interpretation: lexical cleanup + curated aliases account for measurable gain; safe deterministic decomposition adds no measurable lift in this cohort.
 
 Remaining Path A failures (`n=1,750`):
 - missing alias: `1,694` (96.80%)
@@ -120,6 +140,13 @@ Note medication-density (manifest denominator):
 - 1 med: `2,159` (7.52%)
 - >=2 meds: `5,168` (18.00%)
 
+Companion note-density (conditioned on notes with >=1 adjudicated medication mention; `n=7,327`):
+- 1 mention: `2,159` (29.47%)
+- 2 mentions: `1,620` (22.11%)
+- 3 mentions: `1,070` (14.60%)
+- 4 mentions: `682` (9.31%)
+- >=5 mentions: `1,796` (24.51%)
+
 Important interpretation note:
 - The note-density denominator is the adjudication note manifest (`28,705` notes), while normalization accuracy is computed only on adjudicated mention rows (`27,552` mention-level rows).
 - Therefore, “0 meds” in this table means “no adjudicated medication mention captured in current adjudication tables for that note,” not automatically “the note is unusable” or “the note truly has no medication content.”
@@ -129,14 +156,20 @@ Path A focused outputs:
 - `episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/`
 
 Key files:
+- `rq1_table_cohort_adjudication_results_compact.csv`
+- `rq1_table_extraction_performance_mention_level.csv`
 - `rq1_table_normalization_ladder_patha_focus.csv`
 - `rq1_table_patha_failure_taxonomy.csv`
 - `rq1_table_note_med_density.csv`
+- `rq1_table_note_med_density_detailed.csv`
+- `rq1_table_note_med_density_conditioned_ge1.csv`
+- `rq1_table_note_med_density_stats.csv`
 - `rq1_table_visit_level_sensitivity.csv`
 - `rq1_fig_workflow_patha_focus.svg`
 - `rq1_fig_normalization_ladder_patha_focus.svg`
 - `rq1_fig_patha_failure_taxonomy.svg`
 - `rq1_fig_note_med_density.svg`
+- `rq1_fig_note_med_density_conditioned_ge1.svg`
 - `rq1_methods_note_patha_focus.md`
 - `rq1_results_paragraph_patha_focus.md`
 
