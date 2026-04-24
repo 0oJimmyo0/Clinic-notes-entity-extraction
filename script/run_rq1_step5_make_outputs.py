@@ -9,7 +9,10 @@ import argparse
 import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except Exception:  # pragma: no cover - optional plotting dependency
+    plt = None
 import pandas as pd
 
 from rq1_adjudication_utils import write_run_summary
@@ -67,6 +70,8 @@ def _write_table(df: pd.DataFrame, out_dir: Path, stem: str) -> None:
 
 
 def _build_workflow_figure(path: Path) -> None:
+    if plt is None:
+        return
     fig, ax = plt.subplots(figsize=(12, 3.8))
     ax.axis("off")
 
@@ -354,7 +359,7 @@ def main() -> int:
     _write_table(status_confusion_table, out_dir, "rq1_table_top_status_confusion")
 
     fig_path = out_dir / "rq1_pathb_precision_by_confidence.png"
-    if len(conf_df):
+    if len(conf_df) and plt is not None:
         plt.figure(figsize=(7, 4))
         plt.plot(conf_df["band_min"], conf_df["accepted_precision"], marker="o")
         plt.xlabel("Confidence band minimum")

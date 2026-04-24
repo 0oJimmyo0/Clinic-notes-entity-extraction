@@ -214,9 +214,9 @@ def main() -> int:
 
     note_visit = (
         mentions[mentions["adjudicated_canonical_label"].astype(str).str.strip() != ""]
-        .groupby(["person_id", "visit_id"], as_index=False)["adjudicated_canonical_label"]
+        .groupby(["person_id", "visit_id"])["adjudicated_canonical_label"]
         .agg(lambda x: sorted(set(str(v).strip().lower() for v in x if str(v).strip())))
-        .rename(columns={"adjudicated_canonical_label": "drugs"})
+        .reset_index(name="drugs")
     )
     note_visit["person_id"] = normalize_id(note_visit["person_id"])
     note_visit["visit_id"] = normalize_id(note_visit["visit_id"])

@@ -9,7 +9,10 @@ import argparse
 from pathlib import Path
 from typing import Dict, List
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except Exception:  # pragma: no cover - optional plotting dependency
+    plt = None
 import pandas as pd
 
 from rq1_adjudication_utils import write_run_summary
@@ -89,7 +92,7 @@ def main() -> int:
     )
 
     fig_path = out_dir / "rq1_pathb_precision_by_confidence.png"
-    if len(conf_df):
+    if len(conf_df) and plt is not None:
         plt.figure(figsize=(7, 4))
         plt.plot(conf_df["band_min"], conf_df["accepted_precision"], marker="o")
         plt.axhline(float(args.target_precision), color="red", linestyle="--", linewidth=1)
