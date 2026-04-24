@@ -104,52 +104,62 @@ Primary workflow (end-to-end):
 Source cohort/run:
 - `episode_extraction_results/clinic_like_20k_30k/rq1`
 
+Manifest family used for the frozen paper numbers:
+- cohort-specific clinic-like manifests under `episode_notes/manifests_clinic_like_20k_30k/`
+- this replaced an earlier mixed-manifest draft so that cohort construction, LLM extraction, adjudication packets, and paper outputs all use the same visit/note universe
+
 Compact cohort/adjudication/results grounding counts:
-- full eligible visits: `95,078`
-- evaluation visits: `10,828`
-- adjudication visits: `5,000`
+- full eligible visits: `11,812`
+- evaluation visits: `11,812`
+- adjudication visits: `11,812`
 - packet notes: `10,543`
 - packet mentions: `31,282`
-- total adjudicated mention rows used in normalization: `27,552`
-- notes with 0 / 1 / >=2 adjudicated meds: `21,378 / 2,159 / 5,168`
+- total adjudicated mention rows used in normalization: `27,752`
+- notes with 0 / 1 / >=2 adjudicated meds: `15,131 / 2,159 / 5,193`
 
 Mention-level extraction performance (note-grounded adjudication reference):
-- TP: `19,044`
-- FP: `13,096`
+- TP: `19,244`
+- FP: `12,899`
 - FN: `8,508`
-- precision: `0.592533`
-- recall: `0.691202`
-- F1: `0.638075`
+- precision: `0.598700`
+- recall: `0.693428`
+- F1: `0.642591`
 
-Mention-level normalization ladder (`n_mentions = 27,552`):
-- surface-exact baseline: `0.809016`
-- + lexical cleanup: `0.871334` (`+0.062319` vs previous)
-- + curated alias map: `0.936484` (`+0.065150` vs previous)
-- + safe decomposition / full Path A: `0.936484` (`+0.000000` vs previous)
-- full Path A delta vs surface-exact: `+0.127468` (12.75 points)
+Mention-level normalization ladder (`n_mentions = 27,752`):
+- surface-exact baseline: `0.721353`
+- + lexical cleanup: `0.781097` (`+0.059743` vs previous)
+- + curated alias map: `0.845777` (`+0.064680` vs previous)
+- + safe decomposition / full Path A: `0.845777` (`+0.000000` vs previous)
+- full Path A delta vs surface-exact: `+0.124423` (12.44 points)
 - explicit ablation interpretation: lexical cleanup + curated aliases account for measurable gain; safe deterministic decomposition adds no measurable lift in this cohort.
 
-Remaining Path A failures (`n=1,750`):
-- missing alias: `1,694` (96.80%)
-- combination/formulation mismatch: `30` (1.71%)
-- lab/substance/non-medication: `22` (1.26%)
-- ambiguous abbreviation: `4` (0.23%)
+Remaining Path A failures (`n=4,280`):
+- missing alias: `3,823` (89.32%)
+- combination/formulation mismatch: `108` (2.52%)
+- lab/substance/non-medication: `345` (8.06%)
+- ambiguous abbreviation: `4` (0.09%)
 
 Note medication-density (manifest denominator):
-- 0 meds: `21,378` (74.47%)
-- 1 med: `2,159` (7.52%)
-- >=2 meds: `5,168` (18.00%)
+- 0 meds: `15,131` (67.30%)
+- 1 med: `2,159` (9.60%)
+- >=2 meds: `5,193` (23.10%)
 
-Companion note-density (conditioned on notes with >=1 adjudicated medication mention; `n=7,327`):
-- 1 mention: `2,159` (29.47%)
-- 2 mentions: `1,620` (22.11%)
-- 3 mentions: `1,070` (14.60%)
-- 4 mentions: `682` (9.31%)
-- >=5 mentions: `1,796` (24.51%)
+Companion note-density (conditioned on notes with >=1 adjudicated medication mention; `n=7,352`):
+- 1 mention: `2,159` (29.37%)
+- 2 mentions: `1,627` (22.13%)
+- 3 mentions: `1,065` (14.49%)
+- 4 mentions: `695` (9.45%)
+- >=5 mentions: `1,806` (24.56%)
+
+Conditioned note-density interpretation to carry into the paper:
+- `7,352 / 22,483` manifest notes (`32.70%`) had at least one adjudicated medication mention.
+- Among those medication-positive notes, `70.63%` contained at least two adjudicated mentions.
+- This conditioned table is the preferred descriptive view when discussing medication burden within the analyzable clinic-note subset.
 
 Important interpretation note:
-- The note-density denominator is the adjudication note manifest (`28,705` notes), while normalization accuracy is computed only on adjudicated mention rows (`27,552` mention-level rows).
+- The note-density denominator is the cohort-specific adjudication note manifest (`22,483` notes), while normalization accuracy is computed only on adjudicated mention rows (`27,752` mention-level rows).
 - Therefore, “0 meds” in this table means “no adjudicated medication mention captured in current adjudication tables for that note,” not automatically “the note is unusable” or “the note truly has no medication content.”
+- The primary paper endpoint remains mention-level normalization accuracy; note-density is descriptive cohort context, not a success/failure score for the extractor.
 
 ## Paper-Ready Artifacts
 Path A focused outputs:

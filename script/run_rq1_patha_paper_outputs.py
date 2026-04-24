@@ -99,7 +99,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate Path A focused paper outputs.")
     p.add_argument(
         "--cohort-summary-json",
-        default="episode_notes/manifests/cohort_justification_summary.json",
+        default="episode_notes/manifests_clinic_like_20k_30k/cohort_justification_summary.json",
     )
     p.add_argument(
         "--note-truth-summary-json",
@@ -123,7 +123,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--note-manifest-csv",
-        default="episode_notes/manifests/adjudication_note_manifest.csv",
+        default="episode_notes/manifests_clinic_like_20k_30k/adjudication_note_manifest.csv",
     )
     p.add_argument(
         "--alias-artifact",
