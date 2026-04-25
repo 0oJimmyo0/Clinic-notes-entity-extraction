@@ -6,6 +6,8 @@ Focus:
 - extraction robustness by slice
 - polished workflow / normalization / note-density visuals
 - frequent unresolved mentions after Path A
+- audit/reference construction grounding
+- deterministic stage-contribution summaries
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import List, Sequence
 
 import pandas as pd
 
@@ -46,6 +48,30 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--normalization-ladder-csv",
         default="episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/rq1_table_normalization_ladder_patha_focus.csv",
+    )
+    p.add_argument(
+        "--cohort-grounding-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/rq1_table_cohort_adjudication_results_compact.csv",
+    )
+    p.add_argument(
+        "--note-density-stats-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/rq1_table_note_med_density_stats.csv",
+    )
+    p.add_argument(
+        "--failure-taxonomy-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/rq1_table_patha_failure_taxonomy.csv",
+    )
+    p.add_argument(
+        "--extraction-performance-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_patha/rq1_table_extraction_performance_mention_level.csv",
+    )
+    p.add_argument(
+        "--normalization-eval-detailed-csv",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/normalization_eval/rq1_normalization_eval_detailed.csv",
+    )
+    p.add_argument(
+        "--adjudication-patch-summary-json",
+        default="episode_extraction_results/clinic_like_20k_30k/rq1/adjudicated/reviewed_adjudication_patch_summary_strict_final.json",
     )
     p.add_argument(
         "--output-dir",
@@ -199,6 +225,80 @@ def _build_top_unresolved(top_df: pd.DataFrame, n: int = 12) -> pd.DataFrame:
     out = top_df.head(n).copy()
     out["likely_follow_up"] = out["raw_mention_text"].map(_likely_follow_up)
     out = out.rename(columns={"raw_mention_text": "raw_mention", "count": "mention_count"})
+    return out
+
+
+def _lookup_compact_count(cohort_df: pd.DataFrame, item_name: str) -> int:
+    row = cohort_df.loc[cohort_df["item"] == item_name, "value"]
+    if row.empty:
+        raise KeyError(f"Missing cohort item: {item_name}")
+    return int(row.iloc[0])
+
+
+def _lookup_metric(stats_df: pd.DataFrame, metric: str) -> float:
+    row = stats_df.loc[stats_df["metric"] == metric, "value"]
+    if row.empty:
+        raise KeyError(f"Missing metric: {metric}")
+    return float(row.iloc[0])
+
+
+def _build_audit_reference_summary(
+    cohort_df: pd.DataFrame, stats_df: pd.DataFrame, patch_summary: dict
+) -> pd.DataFrame:
+    counts = patch_summary["counts"]
+    reference_rows = _lookup_compact_count(
+        cohort_df, "Total adjudicated mention rows used in normalization"
+    )
+    audited_rows = int(counts["n_keep"])
+    unaudited_rows = int(reference_rows - audited_rows)
+    audit_pct = 100.0 * audited_rows / max(reference_rows, 1)
+
+    rows = [
+        ("Eligible visits", _lookup_compact_count(cohort_df, "Full eligible visits"), "visit"),
+        ("Evaluation visits", _lookup_compact_count(cohort_df, "Evaluation visits"), "visit"),
+        ("Adjudication visits", _lookup_compact_count(cohort_df, "Adjudication visits"), "visit"),
+        ("Manifest notes", int(_lookup_metric(stats_df, "all_manifest_notes_n")), "note"),
+        ("Packet notes", _lookup_compact_count(cohort_df, "Packet notes"), "note"),
+        ("Packet mentions", _lookup_compact_count(cohort_df, "Packet mentions"), "mention"),
+        ("Reference mention rows", reference_rows, "mention"),
+        ("Human-audited rows", audited_rows, "mention"),
+        ("Unaudited rows", unaudited_rows, "mention"),
+        ("Human-audit percentage", round(audit_pct, 2), "% of reference mention rows"),
+    ]
+    return pd.DataFrame(rows, columns=["item", "value", "unit_or_denominator"])
+
+
+def _norm_text(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value).strip().lower()
+
+
+def _build_stage_contribution_summary(norm_df: pd.DataFrame) -> pd.DataFrame:
+    raw = norm_df["raw_mention_text"].map(_norm_text)
+    gold = norm_df["gold_canonical"].map(_norm_text)
+    lex = norm_df["patha_a1_norm"].map(_norm_text)
+    alias = norm_df["patha_a3_alias"].map(_norm_text)
+    final = norm_df["patha_prediction"].map(_norm_text)
+
+    baseline = raw.eq(gold)
+    lexical_only = lex.eq(gold) & ~baseline
+    alias_only = alias.eq(gold) & ~lex.eq(gold)
+    decomposition_only = final.eq(gold) & ~alias.eq(gold)
+    unresolved = ~final.eq(gold)
+
+    stages = [
+        ("Solved by surface exact baseline", int(baseline.sum())),
+        ("Solved by lexical cleanup only", int(lexical_only.sum())),
+        ("Solved by curated alias map only", int(alias_only.sum())),
+        ("Solved by safe decomposition only", int(decomposition_only.sum())),
+        ("Unresolved after full Path A", int(unresolved.sum())),
+    ]
+    total = len(norm_df)
+    out = pd.DataFrame(stages, columns=["stage_contribution", "mention_count"])
+    out["percent_of_reference_rows"] = out["mention_count"].map(
+        lambda x: round(100.0 * float(x) / max(total, 1), 2)
+    )
     return out
 
 
@@ -364,6 +464,94 @@ def _write_slice_robustness_figure(slice_df: pd.DataFrame, out_dir: Path, stem: 
     _convert_svg_to_png(svg_path)
 
 
+def _write_stage_contribution_figure(
+    stage_df: pd.DataFrame, failure_df: pd.DataFrame, out_dir: Path, stem: str
+) -> None:
+    width = 1080
+    height = 360
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">',
+        '<rect x="0" y="0" width="100%" height="100%" fill="white"/>',
+        _svg_text(30, 34, "Path A gain localization and residual failure concentration", 22, "bold"),
+        _svg_text(
+            30,
+            58,
+            "Left: stage-contribution counts on 27,752 reference rows. Right: residual failures are concentrated in missing aliases.",
+            12,
+            "normal",
+            MUTED,
+        ),
+    ]
+
+    stage_map = {
+        "Solved by lexical cleanup only": ACCENT_3,
+        "Solved by curated alias map only": ACCENT_2,
+        "Solved by safe decomposition only": "#9ca3af",
+        "Unresolved after full Path A": "#cbd5e1",
+    }
+    stage_subset = stage_df[
+        stage_df["stage_contribution"].isin(stage_map.keys())
+    ].copy()
+    left = 40
+    top = 100
+    total_w = 440
+    bar_h = 46
+    current_x = left
+    total_ref = 27752
+    for row in stage_subset.itertuples(index=False):
+        width_px = total_w * (row.mention_count / total_ref)
+        width_px = max(width_px, 6 if row.mention_count > 0 else 0)
+        color = stage_map[row.stage_contribution]
+        parts.append(
+            f'<rect x="{current_x:.1f}" y="{top}" width="{width_px:.1f}" height="{bar_h}" fill="{color}" rx="4" ry="4"/>'
+        )
+        short = row.stage_contribution.replace("Solved by ", "").replace(" only", "")
+        if width_px > 42:
+            parts.append(_svg_text(current_x + 8, top + 20, short, 11, "bold", "white"))
+        parts.append(_svg_text(current_x, top + 72, f'{int(row.mention_count):,} ({row.percent_of_reference_rows:.2f}%)', 11))
+        current_x += width_px
+
+    parts.append(_svg_text(left, top - 16, "Stage contributions beyond the surface-exact baseline", 13, "bold"))
+    parts.append(_svg_text(left, top + 102, "Surface-exact baseline already solves 20,019 rows (72.14%).", 11, "normal", MUTED))
+
+    fail_subset = failure_df[
+        failure_df["failure_category"].isin(
+            ["missing alias", "lab/substance/non-medication", "combination/formulation mismatch", "ambiguous abbreviation"]
+        )
+    ].copy()
+    fail_subset["display"] = fail_subset["failure_category"].replace(
+        {
+            "missing alias": "Missing alias",
+            "lab/substance/non-medication": "Lab/substance/non-med",
+            "combination/formulation mismatch": "Combo/formulation",
+            "ambiguous abbreviation": "Ambiguous abbreviation",
+        }
+    )
+    right_x = 600
+    right_top = 105
+    max_bar = 390
+    max_pct = max(float(v) for v in fail_subset["percent_of_patha_failures"]) or 1.0
+    parts.append(_svg_text(right_x, right_top - 22, "Residual failure concentration", 13, "bold"))
+    for i, row in enumerate(fail_subset.itertuples(index=False)):
+        y = right_top + i * 48
+        pct = float(row.percent_of_patha_failures)
+        bw = max_bar * (pct / max_pct)
+        color = ACCENT if i == 0 else BG_BAR
+        stroke = ACCENT if i == 0 else GRID
+        parts.append(_svg_text(right_x, y + 14, row.display, 11))
+        parts.append(
+            f'<rect x="{right_x+170}" y="{y}" width="{max_bar}" height="24" fill="white" stroke="{GRID}" stroke-width="1" rx="4" ry="4"/>'
+        )
+        parts.append(
+            f'<rect x="{right_x+170}" y="{y}" width="{bw:.1f}" height="24" fill="{color}" stroke="{stroke}" stroke-width="1" rx="4" ry="4"/>'
+        )
+        parts.append(_svg_text(right_x + 170 + bw + 8, y + 16, f"{pct:.2f}%", 11, "bold"))
+    parts.append("</svg>")
+    svg_path = out_dir / f"{stem}.svg"
+    _write_svg(svg_path, parts)
+    _convert_svg_to_png(svg_path)
+
+
 def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parents[2]
@@ -374,6 +562,12 @@ def main() -> int:
     top_unresolved = pd.read_csv((root / args.top_unresolved_csv).resolve()).fillna("")
     density_df = pd.read_csv((root / args.note_density_conditioned_csv).resolve()).fillna("")
     ladder_df = pd.read_csv((root / args.normalization_ladder_csv).resolve()).fillna("")
+    cohort_df = pd.read_csv((root / args.cohort_grounding_csv).resolve()).fillna("")
+    stats_df = pd.read_csv((root / args.note_density_stats_csv).resolve()).fillna("")
+    failure_df = pd.read_csv((root / args.failure_taxonomy_csv).resolve()).fillna("")
+    extraction_df = pd.read_csv((root / args.extraction_performance_csv).resolve()).fillna("")
+    norm_eval_df = pd.read_csv((root / args.normalization_eval_detailed_csv).resolve()).fillna("")
+    patch_summary = json.loads((root / args.adjudication_patch_summary_json).resolve().read_text(encoding="utf-8"))
 
     slice_summary = _build_slice_summary(slice_df)
     _write_table(slice_summary, out_dir, "rq1_table_extraction_slice_summary")
@@ -381,10 +575,17 @@ def main() -> int:
     unresolved_summary = _build_top_unresolved(top_unresolved, n=12)
     _write_table(unresolved_summary, out_dir, "rq1_table_top_unresolved_mentions")
 
+    audit_summary = _build_audit_reference_summary(cohort_df, stats_df, patch_summary)
+    _write_table(audit_summary, out_dir, "rq1_table_audit_reference_summary")
+
+    stage_summary = _build_stage_contribution_summary(norm_eval_df)
+    _write_table(stage_summary, out_dir, "rq1_table_stage_contribution_patha")
+
     _write_workflow_figure(out_dir, "rq1_fig_workflow_note_grounded")
     _write_norm_ladder_figure(ladder_df, out_dir, "rq1_fig_normalization_ladder_note_grounded")
     _write_note_density_figure(density_df, out_dir, "rq1_fig_note_density_conditioned_note_grounded")
     _write_slice_robustness_figure(slice_summary, out_dir, "rq1_fig_extraction_slice_robustness")
+    _write_stage_contribution_figure(stage_summary, failure_df, out_dir, "rq1_fig_stage_contribution_and_failures")
 
     summary = {
         "inputs": {
@@ -392,6 +593,25 @@ def main() -> int:
             "top_unresolved_csv": str((root / args.top_unresolved_csv).resolve()),
             "note_density_conditioned_csv": str((root / args.note_density_conditioned_csv).resolve()),
             "normalization_ladder_csv": str((root / args.normalization_ladder_csv).resolve()),
+            "cohort_grounding_csv": str((root / args.cohort_grounding_csv).resolve()),
+            "note_density_stats_csv": str((root / args.note_density_stats_csv).resolve()),
+            "failure_taxonomy_csv": str((root / args.failure_taxonomy_csv).resolve()),
+            "extraction_performance_csv": str((root / args.extraction_performance_csv).resolve()),
+            "normalization_eval_detailed_csv": str((root / args.normalization_eval_detailed_csv).resolve()),
+            "adjudication_patch_summary_json": str((root / args.adjudication_patch_summary_json).resolve()),
+        },
+        "frozen_run_counts": {
+            "reference_rows": int(audit_summary.loc[audit_summary["item"] == "Reference mention rows", "value"].iloc[0]),
+            "human_audited_rows": int(audit_summary.loc[audit_summary["item"] == "Human-audited rows", "value"].iloc[0]),
+            "human_audit_percentage": float(audit_summary.loc[audit_summary["item"] == "Human-audit percentage", "value"].iloc[0]),
+            "surface_exact_rows": int(stage_summary.loc[stage_summary["stage_contribution"] == "Solved by surface exact baseline", "mention_count"].iloc[0]),
+            "lexical_only_rows": int(stage_summary.loc[stage_summary["stage_contribution"] == "Solved by lexical cleanup only", "mention_count"].iloc[0]),
+            "alias_only_rows": int(stage_summary.loc[stage_summary["stage_contribution"] == "Solved by curated alias map only", "mention_count"].iloc[0]),
+            "decomposition_only_rows": int(stage_summary.loc[stage_summary["stage_contribution"] == "Solved by safe decomposition only", "mention_count"].iloc[0]),
+            "unresolved_rows": int(stage_summary.loc[stage_summary["stage_contribution"] == "Unresolved after full Path A", "mention_count"].iloc[0]),
+            "extraction_precision": float(extraction_df.loc[0, "precision"]),
+            "extraction_recall": float(extraction_df.loc[0, "recall"]),
+            "extraction_f1": float(extraction_df.loc[0, "f1"]),
         },
         "outputs": sorted(p.name for p in out_dir.iterdir() if p.is_file()),
     }

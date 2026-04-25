@@ -8,6 +8,9 @@ Study type:
 - adjudication-first
 - treatment-context medication normalization
 
+Implementation note for defensibility:
+- the frozen paper uses an LLM-bootstrapped, human-audited, note-grounded reference construction rather than a fully manual gold-standard annotation campaign
+
 Main claims:
 1. Note-grounded adjudication is required; structured EHR is not extraction truth.
 2. Surface-exact normalization is insufficient.
@@ -112,9 +115,13 @@ Compact cohort/adjudication/results grounding counts:
 - full eligible visits: `11,812`
 - evaluation visits: `11,812`
 - adjudication visits: `11,812`
+- manifest notes: `22,483`
 - packet notes: `10,543`
 - packet mentions: `31,282`
 - total adjudicated mention rows used in normalization: `27,752`
+- human-audited mention rows: `3,188`
+- unaudited mention rows: `24,564`
+- human-audit coverage: `11.49%` of reference mention rows
 - notes with 0 / 1 / >=2 adjudicated meds: `15,131 / 2,159 / 5,193`
 
 Mention-level extraction performance (note-grounded adjudication reference):
@@ -132,6 +139,13 @@ Mention-level normalization ladder (`n_mentions = 27,752`):
 - + safe decomposition / full Path A: `0.845777` (`+0.000000` vs previous)
 - full Path A delta vs surface-exact: `+0.124423` (12.44 points)
 - explicit ablation interpretation: lexical cleanup + curated aliases account for measurable gain; safe deterministic decomposition adds no measurable lift in this cohort.
+
+Stage-contribution summary for deterministic Path A:
+- solved by surface-exact baseline: `20,019` (`72.14%`)
+- solved by lexical cleanup only: `1,658` (`5.97%`)
+- solved by curated alias map only: `1,795` (`6.47%`)
+- solved by safe decomposition only: `0` (`0.00%`)
+- unresolved after full Path A: `4,280` (`15.42%`)
 
 Remaining Path A failures (`n=4,280`):
 - missing alias: `3,823` (89.32%)
@@ -182,6 +196,15 @@ Key files:
 - `rq1_fig_note_med_density_conditioned_ge1.svg`
 - `rq1_methods_note_patha_focus.md`
 - `rq1_results_paragraph_patha_focus.md`
+
+Enriched paper-ready outputs:
+- `episode_extraction_results/clinic_like_20k_30k/rq1/paper_outputs_enriched/`
+- `rq1_table_audit_reference_summary.csv`
+- `rq1_table_stage_contribution_patha.csv`
+- `rq1_fig_workflow_note_grounded.png`
+- `rq1_fig_extraction_slice_robustness.png`
+- `rq1_fig_stage_contribution_and_failures.png`
+- `rq1_paper_enrichment_bundle_summary.json`
 
 ## Scope Guardrails (Do Not Drift)
 - Keep adjudicated note-grounded truth as the primary reference.
