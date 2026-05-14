@@ -120,6 +120,7 @@ def main() -> int:
     note_only_note = _load_csv(note_only_dir / "rq1_note_only_by_note_type.csv")
     note_only_class = _load_csv(note_only_dir / "rq1_note_only_by_drug_class.csv")
     note_only_summary = _load_csv(note_only_dir / "rq1_note_only_evidence_summary.csv")
+    note_only_ladder = _load_csv(note_only_dir / "rq1_note_only_semantic_mismatch_ladder_summary.csv")
     semantic = _load_csv(concord_dir / "rq1_semantic_concordance_summary.csv")
     external = _load_csv(ext_dir / "rq1_external_coverage_summary.csv")
 
@@ -145,6 +146,7 @@ def main() -> int:
         "rq1_bibm_table_residual_patha_taxonomy": residual,
         "rq1_bibm_table_semantic_concordance": semantic,
         "rq1_bibm_table_note_only_summary": note_only_summary,
+        "rq1_bibm_table_note_only_semantic_mismatch_ladder": note_only_ladder,
         "rq1_bibm_table_note_only_by_action": note_only_action,
         "rq1_bibm_table_note_only_by_note_type": note_only_note,
         "rq1_bibm_table_note_only_by_drug_class": note_only_class,

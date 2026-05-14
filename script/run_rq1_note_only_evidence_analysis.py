@@ -112,14 +112,22 @@ def main() -> int:
     ehr["ehr_ingredient_set"] = ehr["ehr_exact_set"].apply(
         lambda xs: sorted({ingredient_level_label(v, brand_generic_map) for v in xs if ingredient_level_label(v, brand_generic_map)})
     )
-    ehr_small = ehr[["person_id", "visit_id", "ehr_exact_set", "ehr_ingredient_set"]].copy()
+    ehr["ehr_category_set"] = ehr["ehr_ingredient_set"].apply(
+        lambda xs: sorted({broad_drug_category(v) for v in xs if broad_drug_category(v) != "unknown"})
+    )
+    ehr_small = ehr[["person_id", "visit_id", "ehr_exact_set", "ehr_ingredient_set", "ehr_category_set"]].copy()
 
     merged = merged.merge(ehr_small, on=["person_id", "visit_id"], how="left")
     merged["ehr_exact_set"] = merged["ehr_exact_set"].apply(lambda x: x if isinstance(x, list) else [])
     merged["ehr_ingredient_set"] = merged["ehr_ingredient_set"].apply(lambda x: x if isinstance(x, list) else [])
+    merged["ehr_category_set"] = merged["ehr_category_set"].apply(lambda x: x if isinstance(x, list) else [])
     merged["note_only_exact"] = merged.apply(lambda r: r["note_canonical_norm"] not in set(r["ehr_exact_set"]), axis=1)
     merged["note_only_ingredient"] = merged.apply(
         lambda r: r["note_ingredient_norm"] not in set(r["ehr_ingredient_set"]),
+        axis=1,
+    )
+    merged["note_only_category"] = merged.apply(
+        lambda r: (str(r["drug_class"]).strip() not in set(r["ehr_category_set"])) if str(r["drug_class"]).strip() else True,
         axis=1,
     )
     merged["evidence_relation"] = merged.apply(
@@ -129,28 +137,75 @@ def main() -> int:
         axis=1,
     )
 
+    visit_category_context = (
+        merged.groupby(["person_id", "visit_id"], dropna=False)["drug_class"]
+        .agg(lambda x: sorted({str(v).strip() for v in x if str(v).strip() and str(v).strip() != "unknown"}))
+        .reset_index(name="note_visit_category_set")
+    )
+    merged = merged.merge(visit_category_context, on=["person_id", "visit_id"], how="left")
+    merged["note_visit_category_set"] = merged["note_visit_category_set"].apply(lambda x: x if isinstance(x, list) else [])
+    merged["visit_has_any_category_overlap"] = merged.apply(
+        lambda r: bool(set(r["note_visit_category_set"]) & set(r["ehr_category_set"])),
+        axis=1,
+    )
+
+    def _semantic_bucket(row: pd.Series) -> str:
+        if not bool(row["note_only_exact"]):
+            return "exact_label_overlap"
+        if not bool(row["note_only_ingredient"]):
+            return "exact_only_mismatch_but_ingredient_overlap"
+        if not bool(row["note_only_category"]):
+            return "ingredient_mismatch_but_category_overlap"
+        if bool(row["visit_has_any_category_overlap"]):
+            return "category_overlap_only"
+        return "no_category_overlap"
+
+    merged["semantic_mismatch_bucket"] = merged.apply(_semantic_bucket, axis=1)
+
     summary = pd.DataFrame(
         [
             {"item": "Mention rows with canonical labels", "value": int(len(merged)), "unit": "mention"},
-            {"item": "Note-only exact mention rows", "value": int(merged["note_only_exact"].sum()), "unit": "mention"},
             {
-                "item": "Note-only ingredient mention rows",
+                "item": "Not represented in same-visit structured EHR medication set at exact-label level",
+                "value": int(merged["note_only_exact"].sum()),
+                "unit": "mention",
+            },
+            {
+                "item": "Not represented in same-visit structured EHR medication set at ingredient level",
                 "value": int(merged["note_only_ingredient"].sum()),
                 "unit": "mention",
             },
             {
-                "item": "Structured-overlap mention rows",
-                "value": int((~merged["note_only_ingredient"]).sum()),
+                "item": "Not represented in same-visit structured EHR medication set at broad category level",
+                "value": int(merged["note_only_category"].sum()),
                 "unit": "mention",
             },
             {
-                "item": "Exact note-only rate",
+                "item": "No same-visit structured EHR category overlap",
+                "value": int((merged["semantic_mismatch_bucket"] == "no_category_overlap").sum()),
+                "unit": "mention",
+            },
+            {
+                "item": "Exact-level not-represented rate",
                 "value": round(safe_div(int(merged["note_only_exact"].sum()), len(merged)), 6),
                 "unit": "fraction",
             },
             {
-                "item": "Ingredient-level note-only rate",
+                "item": "Ingredient-level not-represented rate",
                 "value": round(safe_div(int(merged["note_only_ingredient"].sum()), len(merged)), 6),
+                "unit": "fraction",
+            },
+            {
+                "item": "Category-level not-represented rate",
+                "value": round(safe_div(int(merged["note_only_category"].sum()), len(merged)), 6),
+                "unit": "fraction",
+            },
+            {
+                "item": "Strongest no-category-overlap rate",
+                "value": round(
+                    safe_div(int((merged["semantic_mismatch_bucket"] == "no_category_overlap").sum()), len(merged)),
+                    6,
+                ),
                 "unit": "fraction",
             },
         ]
@@ -224,6 +279,48 @@ def main() -> int:
         .sort_values("mention_rows", ascending=False)
     )
 
+    mismatch_ladder = (
+        merged.groupby("semantic_mismatch_bucket", dropna=False)
+        .agg(
+            mention_rows=("adjudication_unit_id", "count"),
+            unique_medications=("note_canonical_norm", "nunique"),
+            unique_visits=("visit_id", "nunique"),
+            note_only_exact_rows=("note_only_exact", "sum"),
+            note_only_ingredient_rows=("note_only_ingredient", "sum"),
+            note_only_category_rows=("note_only_category", "sum"),
+        )
+        .reset_index()
+    )
+    mismatch_order = {
+        "exact_label_overlap": 0,
+        "exact_only_mismatch_but_ingredient_overlap": 1,
+        "ingredient_mismatch_but_category_overlap": 2,
+        "category_overlap_only": 3,
+        "no_category_overlap": 4,
+    }
+    mismatch_ladder["bucket_order"] = mismatch_ladder["semantic_mismatch_bucket"].map(mismatch_order).fillna(99)
+    mismatch_ladder = mismatch_ladder.sort_values(["bucket_order", "mention_rows"], ascending=[True, False]).drop(
+        columns=["bucket_order"]
+    )
+    mismatch_ladder["mention_rate"] = mismatch_ladder["mention_rows"].map(lambda x: round(safe_div(x, len(merged)), 6))
+
+    mismatch_examples = (
+        merged.groupby(
+            ["semantic_mismatch_bucket", "note_canonical_norm", "action_cue", "note_title_final", "drug_class"],
+            dropna=False,
+        )
+        .agg(
+            mention_rows=("adjudication_unit_id", "count"),
+            example_context=("context_text", "first"),
+        )
+        .reset_index()
+        .sort_values(
+            ["semantic_mismatch_bucket", "mention_rows"],
+            ascending=[True, False],
+        )
+    )
+    mismatch_examples["example_context"] = mismatch_examples["example_context"].astype(str).str.slice(0, 300)
+
     outputs: Dict[str, Path] = {
         "summary_csv": out_dir / "rq1_note_only_evidence_summary.csv",
         "by_action_csv": out_dir / "rq1_note_only_by_action.csv",
@@ -231,6 +328,9 @@ def main() -> int:
         "by_drug_class_csv": out_dir / "rq1_note_only_by_drug_class.csv",
         "top_examples_csv": out_dir / "rq1_note_only_top_examples.csv",
         "relation_breakdown_csv": out_dir / "rq1_note_only_relation_breakdown.csv",
+        "mismatch_ladder_csv": out_dir / "rq1_note_only_semantic_mismatch_ladder.csv",
+        "mismatch_ladder_summary_csv": out_dir / "rq1_note_only_semantic_mismatch_ladder_summary.csv",
+        "mismatch_examples_csv": out_dir / "rq1_note_only_semantic_mismatch_ladder_examples.csv",
         "detailed_csv": out_dir / "rq1_note_only_evidence_detailed.csv",
         "summary_json": out_dir / "rq1_note_only_evidence_summary.json",
     }
@@ -241,6 +341,9 @@ def main() -> int:
     by_drug_class.to_csv(outputs["by_drug_class_csv"], index=False)
     top_examples.to_csv(outputs["top_examples_csv"], index=False)
     relation_breakdown.to_csv(outputs["relation_breakdown_csv"], index=False)
+    mismatch_examples.to_csv(outputs["mismatch_examples_csv"], index=False)
+    mismatch_ladder.to_csv(outputs["mismatch_ladder_csv"], index=False)
+    mismatch_ladder.to_csv(outputs["mismatch_ladder_summary_csv"], index=False)
     merged.to_csv(outputs["detailed_csv"], index=False)
 
     write_run_summary(
@@ -255,6 +358,8 @@ def main() -> int:
                 "canonical_mention_rows": int(len(merged)),
                 "note_only_exact_rows": int(merged["note_only_exact"].sum()),
                 "note_only_ingredient_rows": int(merged["note_only_ingredient"].sum()),
+                "note_only_category_rows": int(merged["note_only_category"].sum()),
+                "no_category_overlap_rows": int((merged["semantic_mismatch_bucket"] == "no_category_overlap").sum()),
             },
             "outputs": {k: str(v) for k, v in outputs.items()},
         },
