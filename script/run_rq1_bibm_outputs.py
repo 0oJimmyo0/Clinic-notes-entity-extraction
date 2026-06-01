@@ -34,6 +34,10 @@ def parse_args() -> argparse.Namespace:
         default="../episode_extraction_results/clinic_like_20k_30k/rq1/semantic_concordance",
     )
     p.add_argument(
+        "--random-audit-dir",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/reference_random_audit_results",
+    )
+    p.add_argument(
         "--external-coverage-dir",
         default="../episode_extraction_results/clinic_like_20k_30k/rq1/external_coverage_sanity_check",
     )
@@ -107,6 +111,7 @@ def main() -> int:
     audit_dir = (root / args.reference_audit_dir).resolve()
     note_only_dir = (root / args.note_only_dir).resolve()
     concord_dir = (root / args.semantic_concordance_dir).resolve()
+    random_audit_dir = (root / args.random_audit_dir).resolve()
     ext_dir = (root / args.external_coverage_dir).resolve()
     out_dir = (root / args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -116,6 +121,8 @@ def main() -> int:
     residual = _load_csv(patha_dir / "rq1_table_patha_failure_taxonomy.csv")
     audit_summary = _load_csv(audit_dir / "rq1_reference_audit_summary.csv")
     audit_error = _load_csv(audit_dir / "rq1_reference_audit_error_taxonomy.csv")
+    random_audit_summary = _load_csv(random_audit_dir / "rq1_reference_random_audit_summary.csv")
+    random_audit_error = _load_csv(random_audit_dir / "rq1_reference_random_audit_error_taxonomy.csv")
     note_only_action = _load_csv(note_only_dir / "rq1_note_only_by_action.csv")
     note_only_note = _load_csv(note_only_dir / "rq1_note_only_by_note_type.csv")
     note_only_class = _load_csv(note_only_dir / "rq1_note_only_by_drug_class.csv")
@@ -151,6 +158,10 @@ def main() -> int:
         "rq1_bibm_table_note_only_by_note_type": note_only_note,
         "rq1_bibm_table_note_only_by_drug_class": note_only_class,
     }
+    if len(random_audit_summary):
+        tables["rq1_bibm_table_random_audit_summary"] = random_audit_summary
+    if len(random_audit_error):
+        tables["rq1_bibm_table_random_audit_error_taxonomy"] = random_audit_error
     if len(external):
         tables["rq1_bibm_table_external_coverage"] = external
 
@@ -197,6 +208,7 @@ def main() -> int:
                 "reference_audit_dir": str(audit_dir),
                 "note_only_dir": str(note_only_dir),
                 "semantic_concordance_dir": str(concord_dir),
+                "random_audit_dir": str(random_audit_dir),
                 "external_coverage_dir": str(ext_dir),
             },
             "outputs": outputs,
