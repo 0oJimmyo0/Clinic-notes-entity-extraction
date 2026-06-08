@@ -1,0 +1,55 @@
+alias_raw,alias_normalized,canonical_label,mapping_type,confidence,include_flag,notes,source_reference
+casodex,casodex,bicalutamide,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+keppra,keppra,levetiracetam,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+vimpat,vimpat,lacosamide,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+asa,asa,aspirin,abbreviation_to_generic,high,yes,Reviewed OMOP no-overlap audit: common medication abbreviation.,manual_review_mismatch_bucket_annotated_2026-06-04
+glucagon human,glucagon human,glucagon,generic_cleanup,medium,yes,Reviewed OMOP no-overlap audit: collapse product wording to ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+effexor,effexor,venlafaxine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+toprol,toprol,metoprolol succinate,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: prefer common Toprol XL ingredient target.,manual_review_mismatch_bucket_annotated_2026-06-04
+uloric,uloric,febuxostat,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+decadron,decadron,dexamethasone,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+zyrtec,zyrtec,cetirizine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+cabometyx,cabometyx,cabozantinib,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+albuterol hfa,albuterol hfa,albuterol,product_to_ingredient,medium,yes,Reviewed OMOP no-overlap audit: collapse inhaler product wording to ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+synthroid,synthroid,levothyroxine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+calcium 600,calcium 600,calcium carbonate,product_to_ingredient,medium,yes,Reviewed OMOP no-overlap audit: collapse supplement wording to major ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+xanax,xanax,alprazolam,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+revlimid,revlimid,lenalidomide,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+estrace,estrace,estradiol,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+firmagon,firmagon,degarelix,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+coumadin,coumadin,warfarin,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+depakote,depakote,divalproex,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: prefer common marketed formulation target.,manual_review_mismatch_bucket_annotated_2026-06-04
+neurontin,neurontin,gabapentin,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+demerol,demerol,meperidine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+haloperidol lactate,haloperidol lactate,haloperidol,formulation_cleanup,medium,yes,Reviewed OMOP no-overlap audit: collapse salt/form wording to ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+zoledronate,zoledronate,zoledronic acid,generic_variant,medium,yes,Reviewed OMOP no-overlap audit: map shorthand generic variant to standard ingredient name.,manual_review_mismatch_bucket_annotated_2026-06-04
+dilaudid,dilaudid,hydromorphone,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+proventil hfa,proventil hfa,albuterol,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: collapse inhaler brand/product wording to ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+eliquis,eliquis,apixaban,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+plavix,plavix,clopidogrel,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+augmentin,augmentin,amoxicillin clavulanate,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: stable branded combination product normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+inlyta,inlyta,axitinib,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+baraclude,baraclude,entecavir,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+nexium,nexium,esomeprazole,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+bromsite,bromsite,bromfenac,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: collapse ophthalmic brand to active ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+navelbine,navelbine,vinorelbine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+xarelto,xarelto,rivaroxaban,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+linzess,linzess,linaclotide,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+zantac,zantac,ranitidine,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: historical brand-to-generic normalization for cohort years.,manual_review_mismatch_bucket_annotated_2026-06-04
+erleada,erleada,apalutamide,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+tylenol,tylenol,acetaminophen,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe OTC brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+mtx,mtx,methotrexate,abbreviation_to_generic,high,yes,Reviewed OMOP no-overlap audit: common medication abbreviation.,manual_review_mismatch_bucket_annotated_2026-06-04
+bentyl,bentyl,dicyclomine,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+lipitor,lipitor,atorvastatin,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+remicade,remicade,infliximab,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+diovan,diovan,valsartan,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+zofran,zofran,ondansetron,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+oxycontin,oxycontin,oxycodone,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: collapse ER brand wording to ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+tagrisso,tagrisso,osimertinib,brand_to_generic,high,yes,Reviewed OMOP no-overlap audit: safe one-to-one oncology brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+flonase,flonase,fluticasone,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: collapse nasal brand to active ingredient.,manual_review_mismatch_bucket_annotated_2026-06-04
+tums,tums,calcium carbonate,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: safe OTC brand normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+janumet,janumet,sitagliptin metformin,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: stable branded combination product normalization.,manual_review_mismatch_bucket_annotated_2026-06-04
+hydrocodone acetaminophen,hydrocodone acetaminophen,hydrocodone acetaminophen,combo_cleanup,medium,yes,Reviewed OMOP no-overlap audit: normalize combination product wording to stable concept text.,manual_review_mismatch_bucket_annotated_2026-06-04
+oxycodone acetaminophen,oxycodone acetaminophen,oxycodone acetaminophen,combo_cleanup,medium,yes,Reviewed OMOP no-overlap audit: normalize combination product wording to stable concept text.,manual_review_mismatch_bucket_annotated_2026-06-04
+dorzolamide timolol,dorzolamide timolol,dorzolamide timolol,combo_cleanup,medium,yes,Reviewed OMOP no-overlap audit: normalize ophthalmic combination wording to stable concept text.,manual_review_mismatch_bucket_annotated_2026-06-04
+zenpep,zenpep,pancrelipase,brand_to_generic,medium,yes,Reviewed OMOP no-overlap audit: collapse pancreatic enzyme brand to generic ingredient family.,manual_review_mismatch_bucket_annotated_2026-06-04

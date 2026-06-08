@@ -34,12 +34,20 @@ def parse_args() -> argparse.Namespace:
         default="../episode_extraction_results/clinic_like_20k_30k/rq1/semantic_concordance",
     )
     p.add_argument(
+        "--temporal-mismatch-dir",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/temporal_mismatch_ladder",
+    )
+    p.add_argument(
         "--random-audit-dir",
         default="../episode_extraction_results/clinic_like_20k_30k/rq1/reference_random_audit_results",
     )
     p.add_argument(
         "--external-coverage-dir",
         default="../episode_extraction_results/clinic_like_20k_30k/rq1/external_coverage_sanity_check",
+    )
+    p.add_argument(
+        "--patha-v1-v2-dir",
+        default="../episode_extraction_results/clinic_like_20k_30k/rq1/patha_v1_v2_sensitivity",
     )
     p.add_argument(
         "--output-dir",
@@ -111,8 +119,10 @@ def main() -> int:
     audit_dir = (root / args.reference_audit_dir).resolve()
     note_only_dir = (root / args.note_only_dir).resolve()
     concord_dir = (root / args.semantic_concordance_dir).resolve()
+    temporal_dir = (root / args.temporal_mismatch_dir).resolve()
     random_audit_dir = (root / args.random_audit_dir).resolve()
     ext_dir = (root / args.external_coverage_dir).resolve()
+    patha_v1_v2_dir = (root / args.patha_v1_v2_dir).resolve()
     out_dir = (root / args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,7 +139,11 @@ def main() -> int:
     note_only_summary = _load_csv(note_only_dir / "rq1_note_only_evidence_summary.csv")
     note_only_ladder = _load_csv(note_only_dir / "rq1_note_only_semantic_mismatch_ladder_summary.csv")
     semantic = _load_csv(concord_dir / "rq1_semantic_concordance_summary.csv")
+    temporal_collapsed = _load_csv(temporal_dir / "rq1_temporal_mismatch_ladder_collapsed_summary.csv")
+    temporal_internal = _load_csv(temporal_dir / "rq1_temporal_mismatch_ladder_internal_summary.csv")
     external = _load_csv(ext_dir / "rq1_external_coverage_summary.csv")
+    patha_v1_v2_compact = _load_csv(patha_v1_v2_dir / "rq1_patha_v1_v2_compact_summary.csv")
+    patha_v1_v2_review = _load_csv(patha_v1_v2_dir / "rq1_patha_v2_review_resolution_compact.csv")
 
     if len(cohort) and len(audit_summary):
         cohort_audit = cohort.copy()
@@ -154,6 +168,7 @@ def main() -> int:
         "rq1_bibm_table_semantic_concordance": semantic,
         "rq1_bibm_table_note_only_summary": note_only_summary,
         "rq1_bibm_table_note_only_semantic_mismatch_ladder": note_only_ladder,
+        "rq1_bibm_table_temporal_mismatch_ladder": temporal_collapsed,
         "rq1_bibm_table_note_only_by_action": note_only_action,
         "rq1_bibm_table_note_only_by_note_type": note_only_note,
         "rq1_bibm_table_note_only_by_drug_class": note_only_class,
@@ -164,6 +179,10 @@ def main() -> int:
         tables["rq1_bibm_table_random_audit_error_taxonomy"] = random_audit_error
     if len(external):
         tables["rq1_bibm_table_external_coverage"] = external
+    if len(patha_v1_v2_compact):
+        tables["rq1_bibm_table_patha_v1_v2_compact"] = patha_v1_v2_compact
+    if len(patha_v1_v2_review):
+        tables["rq1_bibm_table_patha_v2_review_resolution"] = patha_v1_v2_review
 
     for stem, df in tables.items():
         if len(df):
@@ -184,18 +203,24 @@ def main() -> int:
         values = pd.to_numeric(semantic["mean_jaccard"], errors="coerce").fillna(0.0).tolist()
         _write_bar_svg(labels, values, "Semantic Note-to-EHR Concordance", out_dir / "rq1_bibm_fig_semantic_concordance.svg", "{:.3f}")
 
+    if len(temporal_collapsed) and "collapsed_bucket" in temporal_collapsed.columns and "mention_rows" in temporal_collapsed.columns:
+        labels = temporal_collapsed["collapsed_bucket"].astype(str).tolist()
+        values = pd.to_numeric(temporal_collapsed["mention_rows"], errors="coerce").fillna(0.0).tolist()
+        _write_bar_svg(labels, values, "Semantic + Temporal Mismatch Ladder", out_dir / "rq1_bibm_fig_temporal_mismatch_ladder.svg", "{:.0f}")
+
     workflow_mermaid = """flowchart LR
     A[Clinic-note cohort] --> B[Candidate extraction]
     B --> C[Note and mention packets]
     C --> D[LLM bootstrap labels]
     D --> E[Targeted human audit]
-    E --> F[Note-grounded reference set]
-    F --> G[Deterministic normalization ladder]
-    F --> H[Note-only evidence discovery]
-    F --> I[Semantic note-to-EHR concordance]
-    G --> J[BIBM paper tables and figures]
-    H --> J
-    I --> J
+    E --> F[Random reliability audit]
+    F --> G[Note-grounded reference set]
+    G --> H[Deterministic normalization ladder]
+    G --> I[Semantic + temporal mismatch ladder]
+    G --> J[Semantic note-to-EHR concordance]
+    H --> K[BIBM paper tables and figures]
+    I --> K
+    J --> K
 """
     (out_dir / "rq1_bibm_workflow_mermaid.md").write_text(workflow_mermaid, encoding="utf-8")
 
@@ -208,8 +233,10 @@ def main() -> int:
                 "reference_audit_dir": str(audit_dir),
                 "note_only_dir": str(note_only_dir),
                 "semantic_concordance_dir": str(concord_dir),
+                "temporal_mismatch_dir": str(temporal_dir),
                 "random_audit_dir": str(random_audit_dir),
                 "external_coverage_dir": str(ext_dir),
+                "patha_v1_v2_dir": str(patha_v1_v2_dir),
             },
             "outputs": outputs,
         },

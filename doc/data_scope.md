@@ -60,3 +60,17 @@ Structured EHR is used only for:
 - downstream concordance analysis
 - documentation-gap analysis
 - evaluating how often note-grounded comparable medications align with structured medication records
+
+OMOP Vocab used:
+Systematic Nomenclature of Medicine - Clinical Terms (IHTSDO)Remove
+RxNorm (NLM)Remove
+National Drug Code (FDA and manufacturers)Remove
+WHO Anatomic Therapeutic Chemical ClassificationRemove
+Veterans Health Administration National Drug File (VA))Remove
+VA National Drug File Class (VA)Remove
+OMOP RxNorm ExtensionRemove
+Medication Reference Terminology MED-RT (VA)Remove
+HemOncRemove
+OMOP Extension (OHDSI)Remove
+
+version 20260227
