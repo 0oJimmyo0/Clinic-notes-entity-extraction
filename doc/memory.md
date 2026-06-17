@@ -361,3 +361,145 @@ We are in a much stronger place than before:
 The paper should now be positioned as:
 
 A note-grounded clinical informatics framework for auditing, normalizing, and characterizing treatment-context medication evidence in clinic notes, with structured medication history used as a secondary comparator. The main contribution is not proving large medication discordance, but making the sources, limits, and meaning of apparent mismatch measurable and clinically interpretable.
+
+## 2026-06-15 Feedback Triage and To-Do
+
+New feedback to evaluate before the next manuscript revision:
+
+### 1. Too many figures
+
+Assessment:
+- valid concern
+- the current BIBM manuscript likely has more figures than necessary for an 8-page evidence-characterization paper
+- highest-retention figures are:
+  - workflow figure
+  - normalization ladder figure
+  - semantic + temporal mismatch ladder figure
+- lower-priority figures are:
+  - OMOP no-overlap sensitivity bar
+  - manual strict no-overlap review bar
+  - Path A v2 dumbbell
+  - residual failure figure
+
+Recommended action:
+- collapse some figure content into compact tables or prose
+- likely remove at least 1 to 2 of the smaller support figures and keep their main numbers in tables/text
+- preserve only visuals that directly carry the main paper claim
+
+### 2. Remove Path B language and replace `clinic_like_20k_30k`
+
+Assessment:
+- should adapt
+- current manuscript still contains Path B wording in Methods and audit description
+- current manuscript still contains the internal run name `clinic_like_20k_30k` in Results
+
+Recommended action:
+- delete Path B discussion from the main paper unless absolutely required for historical explanation
+- replace with neutral wording:
+  - `frozen cohort run`
+  - `error-enriched difficult-review queue`
+  - `abstention/ambiguity review queue` only if needed
+- remove literal `clinic_like_20k_30k` from text, tables, captions, and file-facing prose
+
+### 3. Clarify what “accuracy” means
+
+Assessment:
+- the current use of `accuracy` is defensible for mention-level closed-set canonical label assignment
+- but it is easy for readers to confuse with extraction precision/recall
+- replacing everything with precision/recall would be misleading unless we fully pivot back to a detection benchmark
+
+Recommended action:
+- do not replace the main Path A metric with precision/recall
+- instead rename more explicitly in prose and captions:
+  - `mention-level canonical mapping accuracy`
+  - or `exact canonical label agreement rate`
+- keep the equation defining the metric
+- if needed, add one sentence:
+  - this is a closed-set label-assignment endpoint over reference mention rows, not a span-detection precision/recall metric
+
+### 4. Meaning of `0.6067`
+
+Assessment:
+- the number is meaningful, but only if framed correctly
+- `0.6067 = 182 / 300` refers to random-audit canonical correctness on previously unaudited reference rows
+- it is not end-to-end pipeline accuracy and not Path A normalization accuracy
+- it is best understood as a conservative estimate of note-grounded reference reliability in the unaudited pool
+
+Recommended action:
+- replace bare `accuracy 0.6067` wording with:
+  - `random-audit canonical correctness rate`
+  - or `reference-label correctness rate in the random unaudited audit sample`
+- explicitly state denominator and object of judgment:
+  - 300 previously unaudited reference rows
+  - judged against adjudicated canonical correctness
+- keep the Wilson CI
+
+### 5. Reframe ablation as baseline + component rather than incremental ladder
+
+Assessment:
+- worth considering, but not obviously better as the main table
+- the current sequential ladder matches the operational pipeline
+- a baseline + one-component-at-a-time table would be more classic as an ablation, but it answers a slightly different question
+
+Recommended action:
+- keep the sequential ladder as the main operational result
+- optionally add a secondary component-isolation sensitivity if easy to compute:
+  - baseline only
+  - baseline + lexical cleanup
+  - baseline + alias map
+  - baseline + safe decomposition
+- if implemented, present it as a supplemental interpretability view, not a replacement for the staged ladder
+
+### 6. Public replication on MIMIC-IV
+
+Assessment:
+- possible only as a partial external replication
+- not a direct match to the current paper goal
+- MIMIC-IV-Note is hospital-note oriented rather than clinic-note oriented, with public note coverage centered on hospital-wide notes such as discharge summaries and radiology reports
+- MIMIC-IV structured medication tables do provide medication timing fields, so note-to-structured comparison is feasible
+- there is also a public PhysioNet medication-label subset for MIMIC-IV discharge summaries, which could support a smaller reproducibility experiment
+
+Recommended action:
+- do not make MIMIC-IV replication a prerequisite for the current BIBM paper unless time is ample
+- if pursued, frame it as:
+  - external portability / reproducibility sensitivity
+  - on hospital-note medication normalization and note-to-structured comparison
+- do not claim it is the same clinic-note treatment-context task
+
+### 7. `kappa = 1` problem
+
+Assessment:
+- this is a real issue
+- current completed random-audit CSV shows reviewer 1 and reviewer 2 fields are identical across the 300 rows for the main judgment fields
+- therefore the current `kappa = 1.00` should not be presented as independent inter-rater reliability unless we can document that two truly independent coders produced those identical labels
+
+Relevant files:
+- annotation CSV:
+  - `episode_extraction_results/clinic_like_20k_30k/rq1/reference_random_audit_sample_bibm_test/completed_manual_annotation_random_audit_reviewer2_completed.csv`
+- analysis script:
+  - `resources/script/run_rq1_reference_random_audit_results.py`
+- current outputs:
+  - `episode_extraction_results/clinic_like_20k_30k/rq1/reference_random_audit_results_bibm_test/...`
+
+Recommended action:
+- remove or downplay `kappa = 1.00` from the paper unless independence can be proven
+- safer manuscript wording:
+  - `double-coded fields were identical in the completed file, but independent coding provenance should be interpreted cautiously`
+  - or omit kappa entirely and report adjudicated audit only
+- best fix:
+  - run an actually independent second human review on a subset
+- do not replace human inter-rater reliability with two external LLM judges
+  - that would not measure human reliability
+  - it would introduce privacy / governance / comparability concerns
+  - it could be a separate AI-adjudication sensitivity study, but not a substitute for kappa
+
+## Immediate To-Do List
+
+1. Revise the BIBM manuscript to remove Path B wording and internal run-name wording.
+2. Rename `accuracy` more explicitly in the paper where needed:
+   - `mention-level canonical mapping accuracy`
+   - `random-audit canonical correctness rate`
+3. Remove or neutralize the `kappa = 1.00` claim unless independence of reviewer 2 can be documented.
+4. Reduce figure count by converting at least one support figure into a compact table or prose summary.
+5. Decide whether to add a secondary baseline-plus-component ablation table; do not replace the sequential ladder unless the alternate view is clearly better.
+6. Treat MIMIC-IV replication as optional future portability work unless a narrowly scoped public sensitivity can be run quickly and honestly.

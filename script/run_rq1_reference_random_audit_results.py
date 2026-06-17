@@ -202,6 +202,25 @@ def main() -> int:
     ci_low, ci_high = _wilson_interval(n_correct, n_reviewed)
     lenient_ci_low, lenient_ci_high = _wilson_interval(n_correct, lenient_den) if lenient_den else (float("nan"), float("nan"))
 
+    valid_span = reviewed[
+        (reviewed["adjudicated_medication_valid_norm"] == "yes")
+        & (reviewed["adjudicated_span_valid_norm"] == "yes")
+    ].copy()
+    n_valid_span = int(len(valid_span))
+    canon_evaluable = valid_span[valid_span["adjudicated_canonical_correct_norm"].isin(["yes", "no"])].copy()
+    n_canon_evaluable = int(len(canon_evaluable))
+    n_canon_evaluable_correct = int((canon_evaluable["adjudicated_canonical_correct_norm"] == "yes").sum())
+    canon_evaluable_accuracy = (
+        n_canon_evaluable_correct / n_canon_evaluable if n_canon_evaluable else float("nan")
+    )
+    canon_eval_ci_low, canon_eval_ci_high = _wilson_interval(n_canon_evaluable_correct, n_canon_evaluable)
+
+    action_evaluable = valid_span[valid_span["adjudicated_action_correct_norm"].isin(["yes", "no"])].copy()
+    n_action_evaluable = int(len(action_evaluable))
+    n_action_correct = int((action_evaluable["adjudicated_action_correct_norm"] == "yes").sum())
+    action_evaluable_accuracy = n_action_correct / n_action_evaluable if n_action_evaluable else float("nan")
+    action_eval_ci_low, action_eval_ci_high = _wilson_interval(n_action_correct, n_action_evaluable)
+
     pool = _rebuild_sample_pool(sample_summary)
     strata_pop = pool["_strata"].value_counts()
     weighted_conservative, weighted_lenient = _weighted_accuracy(ann, strata_pop)
@@ -217,6 +236,17 @@ def main() -> int:
         ("Lenient canonical accuracy", lenient_accuracy, "fraction"),
         ("Lenient Wilson CI low", lenient_ci_low, "wilson_95"),
         ("Lenient Wilson CI high", lenient_ci_high, "wilson_95"),
+        ("Valid medication+span rows", n_valid_span, "row"),
+        ("Canonical evaluable rows", n_canon_evaluable, "row"),
+        ("Canonical evaluable correct rows", n_canon_evaluable_correct, "row"),
+        ("Canonical accuracy among valid medication+span rows", canon_evaluable_accuracy, "fraction"),
+        ("Canonical evaluable Wilson CI low", canon_eval_ci_low, "wilson_95"),
+        ("Canonical evaluable Wilson CI high", canon_eval_ci_high, "wilson_95"),
+        ("Action evaluable rows", n_action_evaluable, "row"),
+        ("Action correct rows among evaluable valid rows", n_action_correct, "row"),
+        ("Action accuracy among valid medication+span rows", action_evaluable_accuracy, "fraction"),
+        ("Action evaluable Wilson CI low", action_eval_ci_low, "wilson_95"),
+        ("Action evaluable Wilson CI high", action_eval_ci_high, "wilson_95"),
         ("Weighted conservative accuracy", weighted_conservative, "fraction"),
         ("Weighted lenient accuracy", weighted_lenient, "fraction"),
     ]
@@ -379,8 +409,11 @@ def main() -> int:
         )
     else:
         paper_text.append(
-            f"After manual review of {n_reviewed:,} random-audit rows, {n_correct:,} rows were canonically correct, yielding conservative canonical accuracy {conservative_accuracy:.4f} "
-            f"(Wilson 95\\% CI {ci_low:.4f} to {ci_high:.4f}) when uncertain judgments were counted as incorrect. "
+            f"After manual review of {n_reviewed:,} random-audit rows, {n_valid_span:,} were adjudicated as valid medication mentions with acceptable spans. "
+            f"Within that evaluable subset, {n_canon_evaluable_correct:,} of {n_canon_evaluable:,} rows were canonically correct, yielding canonical agreement {canon_evaluable_accuracy:.4f} "
+            f"(Wilson 95\\% CI {canon_eval_ci_low:.4f} to {canon_eval_ci_high:.4f}). "
+            f"When all non-evaluable or uncertain rows were conservatively counted as incorrect, the row-level correctness rate was {conservative_accuracy:.4f} "
+            f"(Wilson 95\\% CI {ci_low:.4f} to {ci_high:.4f}). "
             + (
                 f"Lenient accuracy was {lenient_accuracy:.4f} (Wilson 95\\% CI {lenient_ci_low:.4f} to {lenient_ci_high:.4f}) after excluding uncertain canonical judgments. "
                 if lenient_den
@@ -389,6 +422,12 @@ def main() -> int:
             + (
                 f"Weighted conservative accuracy was {weighted_conservative:.4f}. "
                 if not math.isnan(weighted_conservative)
+                else ""
+            )
+            + (
+                f"Action correctness among evaluable valid rows was {action_evaluable_accuracy:.4f} "
+                f"(Wilson 95\\% CI {action_eval_ci_low:.4f} to {action_eval_ci_high:.4f}), indicating that treatment-action attribution was the harder judgment dimension. "
+                if n_action_evaluable
                 else ""
             )
             + "The most frequent adjudicated error categories are summarized in the random-audit error taxonomy table."
@@ -417,6 +456,11 @@ def main() -> int:
             "reviewed_rows": n_reviewed,
             "correct_rows": n_correct,
             "uncertain_rows": n_uncertain,
+            "valid_medication_span_rows": n_valid_span,
+            "canonical_evaluable_rows": n_canon_evaluable,
+            "canonical_evaluable_correct_rows": n_canon_evaluable_correct,
+            "action_evaluable_rows": n_action_evaluable,
+            "action_correct_rows": n_action_correct,
         },
         "metrics": {
             "conservative_accuracy": conservative_accuracy,
@@ -425,6 +469,12 @@ def main() -> int:
             "lenient_accuracy": lenient_accuracy,
             "lenient_ci_low": lenient_ci_low,
             "lenient_ci_high": lenient_ci_high,
+            "canonical_evaluable_accuracy": canon_evaluable_accuracy,
+            "canonical_evaluable_ci_low": canon_eval_ci_low,
+            "canonical_evaluable_ci_high": canon_eval_ci_high,
+            "action_evaluable_accuracy": action_evaluable_accuracy,
+            "action_evaluable_ci_low": action_eval_ci_low,
+            "action_evaluable_ci_high": action_eval_ci_high,
             "weighted_conservative_accuracy": weighted_conservative,
             "weighted_lenient_accuracy": weighted_lenient,
         },

@@ -499,7 +499,8 @@ def _read_adjudicated_labels(path: Optional[Path]) -> List[str]:
     df = pd.read_csv(path)
     lower = {c.lower(): c for c in df.columns}
     col = (
-        lower.get("adjudicated_drug_label")
+        lower.get("adjudicated_canonical_label")
+        or lower.get("adjudicated_drug_label")
         or lower.get("canonical_label")
         or lower.get("drug_label")
         or lower.get("label")

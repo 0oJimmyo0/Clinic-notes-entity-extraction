@@ -257,6 +257,14 @@ def main() -> int:
         sample_df = pd.concat(parts, ignore_index=True).drop_duplicates("adjudication_unit_id")
         if len(sample_df) > args.sample_size:
             sample_df = sample_df.sample(n=args.sample_size, random_state=args.seed)
+        elif len(sample_df) < args.sample_size:
+            remaining = sample_pool[
+                ~sample_pool["adjudication_unit_id"].astype(str).isin(sample_df["adjudication_unit_id"].astype(str))
+            ].copy()
+            n_fill = min(args.sample_size - len(sample_df), len(remaining))
+            if n_fill > 0:
+                fill = remaining.sample(n=n_fill, random_state=args.seed)
+                sample_df = pd.concat([sample_df, fill], ignore_index=True).drop_duplicates("adjudication_unit_id")
 
     out_csv = out_dir / "rq1_reference_random_audit_sample.csv"
     sample_df.to_csv(out_csv, index=False)
