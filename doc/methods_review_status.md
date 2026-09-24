@@ -16,6 +16,8 @@ The supplied response explicitly describes itself as biomedical-informatics/clin
 | Use complete ingredient set for fixed combinations and unambiguous brand/generic mapping; no forced RxNorm code | `raw_note_annotation_guide_draft.md`, `gold_evaluation_contract.md` | Freeze terminology release and salt/form equivalence |
 | Use minimal identity-bearing spans; evaluate strict boundaries separately if relaxed scoring is chosen | `gold_evaluation_contract.md` | Freeze allowable extra text, duplicate/tie rules, and ambiguous prediction handling |
 | Require more than category similarity or date proximity to call matches the same clinical medication event | `revision_plan.md`; downstream match-review guide still needed | Clinician-reviewed RQ3 guide and blinded match-validation pilot |
+| Annotate broadly but use a treatment-relevant named primary target and broader named-mention sensitivity, reflecting the action/context-triggered legacy pipeline | `legacy_task_scope_audit.md`, `raw_note_annotation_guide_draft.md`, `gold_evaluation_contract.md` | Qualified clinician and pilot settle exact boundaries and prediction FP treatment before gold scoring; broad misses remain visible |
+| Resolve previous patient exposure with investigator artifact/batch attestations and restricted patient-linked exceptions | `investigator_exposure_attestation_template.md`, `validation_sampling_frame.md` | Signed/factually verified coverage from relevant investigators; governance and patient eligibility still unconfirmed |
 
 ## Unresolved decisions (do not mark as complete based on this review)
 

@@ -2,7 +2,7 @@
 
 Status: **PROVISIONAL METHODS DRAFT; not clinician-approved, not pilot-tested, not frozen** (2026-09-24)
 
-This guide translates a biomedical-informatics/clinical-methods review into proposed annotation rules. The review examined **no real patient notes** and is **not** human gold annotation, inter-rater agreement, IRB approval, or clinician sign-off. A qualified, authorized clinician and a second independent annotator must review the task before any final gold annotation. The actual study authorization and patient-exposure classification remain separate gates.
+This guide translates a biomedical-informatics/clinical-methods review into proposed annotation rules. The review examined **no real patient notes** and is **not** human gold annotation, inter-rater agreement, IRB approval, or clinician sign-off. A [legacy code-scope audit](legacy_task_scope_audit.md) indicates that the existing system selects action/context-triggered candidate sentences rather than performing exhaustive medication NER. A qualified, authorized clinician and a second independent annotator must review the task before any final gold annotation. The actual study authorization and patient-exposure classification remain separate gates.
 
 ## 1. Task and information barrier
 
@@ -23,7 +23,18 @@ The proposed primary annotation is at the **textual mention** level. Record ever
 | Class-only/vague patient medication | Retain as a **class/vague** stratum for detection/descriptive counts, not ingredient-level identity credit | “Continue steroids”; do not invent prednisone. |
 | Dose-only/pronoun reference without a local explicit name | Do not create a standalone ingredient mention | “Increase it to 20 mg”; do not use structured EHR to guess the drug. |
 
-**Open scope decision:** The historical/planned/negated strata could be broader than the legacy treatment-context pipeline was built to detect. Before freezing, compare these proposed labels with the *pre-existing* pipeline specification on development data. Prespecify either a broad mention-detection headline plus an affirmative/current subset, or a narrower primary target with separate strata; do not change the target after seeing gold-test results.
+### Broad annotation, hierarchical scoring — proposed, not frozen
+
+Annotate broadly enough to see candidate misses, then assign every annotated mention to a **prespecified endpoint stratum** without looking at pipeline predictions:
+
+| Endpoint stratum | Proposed content | Reporting role |
+|---|---|---|
+| **Primary treatment-relevant named evidence** | Patient-linked named drugs tied to current use/continuation; explicit start, stop, hold, or same-drug change; firm patient-specific planned treatment; or explicit taking/**not-taking** status. A clinician must decide how context-poor current medication lists and tentative “may consider” statements fit. | Headline RQ1 detection and end-to-end normalized identity, with explicit identity-evaluable denominator. |
+| **Broader named-mention sensitivity** | All explicit patient-linked named medication occurrences, including remote historical drugs and tentative patient-specific discussion. | Secondary detection analysis on the same raw-note sample; show the primary-to-broad gap and candidate misses. |
+| **Reported strata** | Current, historical, planned/considered, negated; plus class-only and unresolvable identity counts. | Do not silently collapse into current treatment or ingredient-level accuracy. |
+| **Outside the proposed treatment target** | Allergy-only mentions, another person's medication, general pharmacology; verify boundary in pilot. | Exclusions and their prediction/precision treatment must be frozen before scoring. |
+
+The [code-derived legacy task audit](legacy_task_scope_audit.md) supports a treatment-relevant **primary** target, not an all-mentions primary endpoint. The clinical boundary remains open until qualified clinician review and development-data pilot. Do not narrow it after seeing new gold results, and do not hide poor broad-mention recall by omitting the secondary sensitivity.
 
 ## 3. Orthogonal fields for each mention
 
@@ -65,7 +76,7 @@ Before the authorized pilot, build ~15–20 adjudicated **synthetic or developme
 
 ## 6. Scoring decisions that this guide does not settle
 
-The [gold evaluation contract](gold_evaluation_contract.md) must freeze these **before final gold scoring**: primary broad versus current-use target; handling of excluded, class-only, and unresolvable mentions in each denominator; whether a system's specific-drug prediction on an unresolvable/class-only gold span is ignored or penalized; one-to-one span matching and limits on extra span text; exact-boundary diagnostic; duplicate handling; ingredient-set equality; patient/note weights; and bootstrap rules. Report detection, resolvable-identity coverage, normalized extraction, and note-level set metrics as distinct quantities. Do not make normalized F1 look better by silently removing difficult mentions.
+The [gold evaluation contract](gold_evaluation_contract.md) must freeze these **before final gold scoring**: the exact primary treatment-relevant boundary and broader sensitivity; handling of excluded, class-only, and unresolvable mentions in each denominator; whether a system's specific-drug prediction on a non-primary/unresolvable/class-only gold span is ignored or penalized; one-to-one span matching and limits on extra span text; exact-boundary diagnostic; duplicate handling; ingredient-set equality; patient/note weights; and bootstrap rules. Report primary and broader detection, resolvable-identity coverage, normalized extraction, and note-level set metrics as distinct quantities. Do not make normalized F1 look better by silently removing difficult mentions.
 
 ## 7. Approval and pilot record (leave OPEN until factual review)
 

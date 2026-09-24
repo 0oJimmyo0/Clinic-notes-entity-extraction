@@ -20,14 +20,16 @@ Any conflict with independent review (for example, previously saw study notes or
 
 ## 2. Primary annotation rules — `raw_note_annotation_guide_draft.md` and `gold_evaluation_contract.md`
 
-For each row, write **Include / Exclude / Separate stratum / Uncertain**, a concise rule, and one *synthetic* example. The answer should be usable by two independent annotators.
+For each row, write **Primary treatment-relevant / Broader named-mention sensitivity only / Separate non-identity stratum / Excluded / Uncertain**, a concise rule, and one *synthetic* example. Distinguish broad **annotation** from primary **scoring**; the answer should be usable by two independent annotators.
 
 | Mention type | Decision | Rule and synthetic example |
 |---|---|---|
 | Current, specific medication | | |
+| Current medication list with no action cue or possible copy-forward | | |
 | Historical medication | | |
+| Remote historical treatment with no present plan | | |
 | Planned or considered medication | | |
-| Negated medication | | |
+| Explicitly not taking a named medication | | |
 | Discussion or comparison only | | |
 | Class-only/vague mention (e.g., “steroids”) | | |
 | Brand name versus generic ingredient | | |
@@ -39,8 +41,9 @@ For each row, write **Include / Exclude / Separate stratum / Uncertain**, a conc
 Primary canonical identity level (ingredient / ingredient set / other):  
 When should an RxNorm link be required versus merely recorded if available?  
 What counts as a valid medication span if nearby action/dose words are included?  
-Does the proposed broad detection target (including historical/planned/negated mentions) match the intended system task? If not, what primary target and separately reported strata would you choose **before test scoring**?  
+Does the [code-derived legacy task scope](legacy_task_scope_audit.md) support the proposed primary treatment-relevant target? Which broad annotated mentions should be secondary only, and which excluded? Decide this **before test scoring**, including tentative plans, remote history, copied lists, and explicit not-taking statements.  
 How should class-only and unresolvable mentions contribute to detection, identity denominators, and false-positive counts?  
+How should system predictions overlapping secondary-but-not-primary or excluded mentions count in primary precision?  
 Any rule that must remain open until the pilot, and why?  
 
 ## 3. Secondary labels and annotation workload — `gold_evaluation_contract.md` and `adjudication_schema.md`
@@ -58,6 +61,7 @@ Any rule that must remain open until the pilot, and why?
 - Is the distinction between automated-only packet creation and human/development exposure clear?  
 - Have you personally viewed any out-of-BIBM notes/outputs or used them in methods development? **Do not list IDs here**; tell the PI through the restricted channel if yes or unsure.  
 - Which exposure questions should the PI/original investigators answer before the pilot?  
+- Can the investigators use the separate [PHI-free batch attestation template](investigator_exposure_attestation_template.md), with patient-level exceptions held only in restricted storage? This question does not ask you to certify their exposure.  
 
 ## 5. Overall recommendation
 
