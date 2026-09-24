@@ -1,8 +1,8 @@
 # Independent Raw-Note Gold Evaluation Contract
 
-Status: **draft for pilot; NOT FROZEN OR SCORED** (2026-09-24)
+Status: **draft for pilot; NOT CLINICIAN-APPROVED, FROZEN, OR SCORED** (2026-09-24)
 
-Purpose: define RQ1's human-gold target and evaluator before the independent sample is drawn or any gold-test predictions/metrics are inspected. This contract is distinct from `adjudication_schema.md`, which starts from candidate packets and cannot measure medications missed by candidate generation. Keep patient IDs, note text, and ID-level manifests in restricted storage, not this document or the manuscript repository.
+Purpose: define RQ1's human-gold target and evaluator before the independent sample is drawn or any gold-test predictions/metrics are inspected. The [provisional raw-note annotation guide](raw_note_annotation_guide_draft.md) contains proposed clinical rules from a **methods draft that examined no patient notes**; it is not a completed human/clinician review. This contract is distinct from `adjudication_schema.md`, which starts from candidate packets and cannot measure medications missed by candidate generation. Keep patient IDs, note text, and ID-level manifests in restricted storage, not this document or the manuscript repository.
 
 ## Freeze record (complete after the excluded-patient/development pilot)
 
@@ -11,6 +11,8 @@ Purpose: define RQ1's human-gold target and evaluator before the independent sam
 | Governance and full-text authorization | **OPEN** |
 | Eligible patient/note frame and exclusion rules | **OPEN** |
 | Primary task boundary and annotation-guide version | **OPEN** |
+| Clinician sign-off and second independent annotator | **OPEN** |
+| Broad mention target versus affirmative/current subset; class-only/allergy/uncertain rules | **OPEN** |
 | Patient and note sampling seed, strata, per-patient cap, inclusion probabilities | **OPEN** |
 | Primary estimand (note-weighted or patient-weighted) | **OPEN** |
 | Full-note pipeline and all resource/code versions, including development-only aliases | **OPEN** |
@@ -29,9 +31,9 @@ Primary input and annotation context: the **complete raw clinic note**, if autho
 
 ## Annotation task boundary (pilot decisions required)
 
-Required human labels for every in-scope medication mention: validity, contiguous mention offsets, and canonical identity at the selected primary level. Record an explicit uncertain/unresolvable identity code; never infer a specific ingredient from structured EHR. Optional or secondary labels: action and temporality; negation/certainty/rationale only as needed for validity or secondary analysis. Annotators see no pipeline candidates, LLM outputs, aliases, projected labels, or structured medication history.
+Proposed required labels for every in-scope medication mention: validity, minimal contiguous medication-identity offsets, identity resolvability, and canonical ingredient/complete ingredient set when resolvable. Record explicit `UNRESOLVABLE` or `UNCERTAIN_IDENTITY` codes; never infer a specific ingredient from structured EHR. Record temporality and simple assertion (affirmed/negated/uncertain) separately for each mention **if the clinician/pilot confirms their feasibility**. Treatment action remains secondary; certainty/rationale may be limited to ambiguous cases. Do not overload the legacy `mention_status` field. Annotators see no pipeline candidates, LLM outputs, project aliases, projected labels, or structured medication history.
 
-The guide must give examples and a prespecified in-scope/excluded decision for each of: historical medications, negated mentions, planned/discussed medications, medication classes or vague terms (for example “steroids”), combinations, brand names, dosage-only references, and repeat mentions. Do not silently include a class-only mention in an ingredient-level denominator or silently exclude a difficult mention after scoring. Specify whether uncertain/unresolvable gold mentions count for detection only, are excluded from identity scoring, or form an explicit abstention category; report their count either way.
+The guide must give examples and a prespecified in-scope/excluded decision for each of: current, historical, planned/discussed, negated, allergy-only, family-member/general-discussion, class-only/vague, combination, brand, dose-only/anaphoric, and repeated mentions. Provisional recommendation: retain patient-linked historical/planned/negated mentions in detection with separate strata, exclude general discussion and allergy-only references from the treatment-medication target, and report an affirmative/current subset. **Before freeze, check whether this broader detection target matches the pre-existing pipeline's intended scope**; prespecify any narrower primary target on development data, not after gold scores. Do not silently include class-only or uncertain identity mentions in ingredient-level scoring or remove difficult mentions after scoring.
 
 ## One-to-one matching contract (choose exact rules in the pilot)
 
@@ -39,15 +41,15 @@ The evaluator must make a **one-to-one** assignment within each note: one gold m
 
 Freeze the following before scoring:
 
-1. **Span detection:** exact boundaries versus a defined overlap criterion; whether action words, punctuation, and dosage tokens may be included in a predicted span; how a partial match is scored. Report a strict-boundary diagnostic if the primary rule is relaxed.
+1. **Span detection:** gold uses minimal identity-bearing offsets. Decide exact boundaries versus a defined relaxed criterion; a proposed relaxed rule requires coverage of **all** drug-identity-bearing gold tokens, not merely one overlapping token. Specify limits on extra action/dose/context text so an excessively broad prediction cannot get unearned credit. Report strict-boundary matching separately if the primary rule is relaxed.
 2. **Tie breaking:** deterministic maximum one-to-one assignment when several predictions overlap one gold or vice versa; define priority by span quality, then identity, then stable ID, with no dependence on hidden gold-test aggregate results.
-3. **Primary canonical identity:** ingredient or ingredient-set representation, versioned RxNorm/terminology mapping, brand/generic equivalence, salts/forms, and whether a combination requires **all** ingredients to match. A broad therapeutic class must not count as a correct specific ingredient unless the gold target itself is class-level and that scoring rule is prespecified.
+3. **Primary canonical identity:** one ingredient or a complete unordered active-ingredient set, versioned RxNorm/terminology mapping where unambiguous, brand/generic equivalence, and frozen salt/form rules. Dose, strength, route, frequency, and formulation are not identity criteria. A broad therapeutic class must not count as a correct specific ingredient; if class-level scoring is wanted, report a separate endpoint. A combination missing any active ingredient is not an exact ingredient-set match.
 4. **Correct normalized prediction:** require both a valid mention match under rule 1 and identity equality under rule 3. Specify whether a correct identity with a nonmatching text span is a false positive plus false negative (default: yes).
-5. **Ambiguous or uncertain gold/predictions:** explicit inclusion, exclusion, or abstention rule and denominator; no post hoc removal.
+5. **Ambiguous, class-only, or uncertain gold/predictions:** freeze separate detection and normalized-identity scoring masks and the treatment of system predictions overlapping excluded/unresolvable mentions. Report the count and proportion of gold mentions excluded from ingredient scoring and, where useful, both full-sample joint yield and conditional performance. No post hoc removal or unexplained denominator change.
 6. **Note-level medication set:** deduplicate identities within a note only for this secondary endpoint; specify how repeats with differing action/temporality are treated. Do not substitute note-level sets for mention-level primary P/R/F1.
-7. **Candidate recall:** every in-scope gold mention is the denominator, including candidate-negative notes. Match against the *candidate stage before normalization*, using its own frozen span rule. Report candidate-negative and candidate-positive note misses separately.
+7. **Candidate recall:** every in-scope gold mention in the prespecified detection target is the denominator, including candidate-negative notes. Match against the *candidate stage before normalization*, using its own frozen span rule. Report candidate-negative and candidate-positive note misses separately and provide important clinical strata (current, historical, planned, negated) when adequately powered.
 
-Report mention extraction P/R/F1 and **end-to-end normalized mention P/R/F1** separately. Conditional identity accuracy is calculated only among valid matched mentions and must not be presented as end-to-end performance. Action metrics are secondary, including class prevalence, per-class P/R/F1, macro-F1, and majority-class baseline if counts permit. A comparator unable to emit a field is marked unsupported for that field, not scored using a different note set.
+Report mention extraction P/R/F1, evaluable ingredient-identity coverage, and **end-to-end normalized mention P/R/F1** separately, with explicit gold/prediction denominators for each. Conditional identity accuracy is calculated only among valid matched mentions and must not be presented as end-to-end performance. Action metrics are secondary, including class prevalence, per-class P/R/F1, macro-F1, and majority-class baseline if counts permit; a drug switch is provisionally a stop plus start, while `change` is an explicit same-drug regimen modification. A comparator unable to emit a field is marked unsupported for that field, not scored using a different note set.
 
 ## Uncertainty, reporting, and audit
 
